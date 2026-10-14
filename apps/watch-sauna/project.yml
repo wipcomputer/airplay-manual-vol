@@ -1,0 +1,25 @@
+# Generate the Xcode project with: xcodegen generate   (brew install xcodegen)
+name: Sauna
+options:
+  bundleIdPrefix: computer.wip.wallvol
+  deploymentTarget:
+    watchOS: "10.0"
+targets:
+  Sauna:
+    type: application
+    platform: watchOS
+    sources: [Sources]
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Sauna
+        WKApplication: true
+        WKWatchOnly: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: computer.wip.wallvol.sauna
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "4"

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Unlock Panel</title>
+<style>
+  /* Stands in for the iPhone app opened by the panel's NFC tag */
+  :root { --bg: #f2f2f7; --card: #fff; --text: #1c1c1e; --muted: #6e6e73; --line: #d1d1d6; --accent: #0a84ff; --red: #dc3a2f; --green: #30d158;
+          --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #000; --card: #1c1c1e; --text: #f2f2f7; --muted: #98989d; --line: #38383a; } }
+  :root[data-theme="dark"] { --bg: #000; --card: #1c1c1e; --text: #f2f2f7; --muted: #98989d; --line: #38383a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 16px/1.4 var(--font); display: flex; flex-direction: column; }
+  main { flex: 1; padding: 56px 22px 18px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; }
+  .nfc { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-size: 24px; margin: 6px 0 0; }
+  p { margin: 0; color: var(--muted); font-size: 15px; }
+  .icon { width: 96px; height: 96px; border-radius: 24px; display: grid; place-items: center; background: var(--card); margin-top: 18px; }
+  .icon svg { width: 52px; height: 52px; }
+  .face { animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(.9); opacity: .6; } }
+  .ok { color: var(--green); } .bad { color: var(--red); }
+  footer { padding: 12px 18px 28px; }
+  .primary { width: 100%; padding: 15px; border: 0; border-radius: 14px; background: var(--accent); color: #fff; font: 600 17px var(--font); cursor: pointer; }
+  .primary:disabled { opacity: .5; }
+  .note { font-size: 13px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main id="main"></main>
+<footer><button class="primary" id="go" hidden></button></footer>
+<script src="/api.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const PANEL = new URLSearchParams(location.search).get('panel') || 'panel-1';
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+const OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>';
+const FACE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M9 9v1M15 9v1M12 9v4h-1M9 16c1.7 1.3 4.3 1.3 6 0"/></svg>';
+
+let key = null;
+try { key = localStorage.getItem(`wallvol.key.${PANEL}`); } catch {}
+
+function show(html, button, onClick) {
+  $('main').innerHTML = html;
+  $('go').hidden = !button; $('go').disabled = false; $('go').textContent = button || ''; $('go').onclick = onClick;
+}
+
+async function sign(message) {
+  const k = await crypto.subtle.importKey('raw', new Uint8Array(key.match(/../g).map(h => parseInt(h, 16))),
+                                          { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(message));
+  return [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function unlock() {
+  show(`<div class="nfc">Wall Volume Panel</div><div class="icon face">${FACE}</div><h1>Face ID</h1>`, null);
+  await new Promise(r => setTimeout(r, 900));   // Face ID (simulated)
+  try {
+    const ts = Math.floor(Date.now() / 1000);
+    const nonce = [...crypto.getRandomValues(new Uint8Array(12))].map(b => b.toString(16).padStart(2, '0')).join('');
+    const sig = await sign(`${PANEL}|${ts}|${nonce}`);
+    const r = await fetch(`/api/panels/${encodeURIComponent(PANEL)}/unlock`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ts, nonce, sig }) });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error);
+    show(`<div class="nfc">Wall Volume Panel</div><div class="icon ok">${OPEN}</div><h1>Unlocked</h1><p>The panel is ready to use.</p>`, null);
+  } catch (e) {
+    show(`<div class="nfc">Wall Volume Panel</div><div class="icon bad">${LOCK}</div><h1>Couldn't unlock</h1><p class="bad">${esc(e.message)}</p>`, 'Try Again', unlock);
+  }
+}
+
+if (!key) {
+  show(`<div class="nfc">NFC · Wall Volume Panel</div><div class="icon bad">${LOCK}</div><h1>Not your panel</h1>
+        <p>This iPhone isn't paired with this panel. A panel unlocks only for iPhones that set it up (or added a device to it).</p>`, null);
+} else if (!crypto.subtle) {
+  show(`<div class="nfc">NFC · Wall Volume Panel</div><div class="icon bad">${LOCK}</div><h1>Can't sign here</h1>
+        <p class="note">This browser only allows the signing step on https or localhost. Open the demo on this computer at 127.0.0.1.</p>`, null);
+} else {
+  show(`<div class="nfc">NFC · Wall Volume Panel</div><div class="icon">${LOCK}</div><h1>Unlock this panel?</h1>
+        <p>You tapped your iPhone on a locked panel.</p>`, 'Unlock with Face ID', unlock);
+}
+</script>
+</body>
+</html>

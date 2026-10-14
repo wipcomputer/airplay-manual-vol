@@ -1,0 +1,14 @@
+{
+  "name": "wallvol-matter-bridge",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local Matter controller for the wallvol prototype (commission and control plugs, lights, dimmers)",
+  "type": "module",
+  "main": "bridge.mjs",
+  "license": "MIT",
+  "dependencies": {
+    "@matter/main": "0.17.9",
+    "@matter/nodejs": "0.17.9",
+    "@project-chip/matter.js": "0.17.9"
+  }
+}

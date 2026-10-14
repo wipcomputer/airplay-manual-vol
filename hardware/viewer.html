@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model 01 Parts</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&display=swap">
+<style>
+  :root {
+    --bg: #d6d7d9; --text: #1d1d1f; --muted: #6b6d70; --line: #b4b6b9; --panel: rgba(255,255,255,.55);
+    --font: "Jost", Futura, "Avenir Next", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1c1d1f; --text: #e8e8e6; --muted: #96989b; --line: #44464a; --panel: rgba(0,0,0,.35); }
+  }
+  :root[data-theme="dark"] { --bg: #1c1d1f; --text: #e8e8e6; --muted: #96989b; --line: #44464a; --panel: rgba(0,0,0,.35); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); overflow: hidden; }
+  #view { position: fixed; inset: 0; }
+  .hud { position: fixed; left: 16px; top: 16px; width: min(300px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
+         overflow: auto; background: var(--panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+         border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  h1 { font-size: 13px; font-weight: 500; letter-spacing: .24em; text-transform: uppercase; margin: 0 0 2px; }
+  .sub { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+  label.row { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  input[type=range] { flex: 1; accent-color: var(--text); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { font: inherit; font-size: 12px; color: var(--text); background: transparent; border: 0; padding: 4px 11px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--text); color: var(--bg); }
+  button.text { font: inherit; font-size: 12px; color: var(--text); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  .parts { list-style: none; margin: 10px 0 0; padding: 10px 0 0; border-top: 1px solid var(--line); }
+  .parts li { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 2px 0; }
+  .parts li .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; border: 1px solid rgba(0,0,0,.2); }
+  .parts li small { color: var(--muted); margin-left: auto; font-size: 11px; }
+  .parts input { accent-color: var(--text); }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .err { color: #dc3a2f; font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div class="hud">
+  <h1>Model 01 · Parts</h1>
+  <p class="sub">Wall mockup: printed parts plus the bought parts they hold.</p>
+  <label class="row">Knobs <span class="seg" id="knobs"><button data-n="1">1</button><button data-n="2">2</button><button data-n="3">3</button></span></label>
+  <label class="row">Explode <input type="range" id="explode" min="0" max="100" value="60"></label>
+  <label class="row"><input type="checkbox" id="spin"> Auto-rotate</label>
+  <label class="row"><input type="checkbox" id="printedOnly"> Printed parts only</label>
+  <button class="text" id="reset">Reset view</button>
+  <ul class="parts" id="parts"></ul>
+  <p class="hint">Drag to rotate · scroll or pinch to zoom · right-drag to pan. Print files: <code>models/print/</code>.</p>
+  <p class="err" id="err" hidden></p>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { return localStorage.getItem(`viewer.${k}`) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(`viewer.${k}`, v); } catch {} },
+};
+
+// ---- Scene: millimetres; Z out of the wall, rotated so the wall faces the camera ----
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+$('view').appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 1, 5000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f96, 1.4));
+const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(150, 220, 300); scene.add(key);
+const rim = new THREE.DirectionalLight(0xffffff, .6); rim.position.set(-250, -100, -200); scene.add(rim);
+
+const root = new THREE.Group();     // the assembly
+scene.add(root);
+
+function themeBackground() {
+  scene.background = new THREE.Color(getComputedStyle(document.body).backgroundColor);
+}
+themeBackground();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', themeBackground);
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  // On wide screens, centre the model in the space right of the side panel
+  const hud = w > 900 ? document.querySelector('.hud').offsetWidth + 32 : 0;
+  if (hud) camera.setViewOffset(w, h, -hud / 2, 0, w, h); else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+function resetView(width = 114) {
+  const d = Math.max(width, 120) * 2.6;
+  camera.position.set(-d * .42, d * .24, d * .92);   // front-left three-quarter view
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+// ---- Load the parts for a knob count from models/parts.json ----
+const loader = new STLLoader();
+let manifest = null, meshes = [];
+async function load(knobs) {
+  root.clear();
+  meshes = [];
+  const entry = manifest[String(knobs)];
+  await Promise.all(entry.parts.map(async p => {
+    const geo = await loader.loadAsync(`models/${p.file}`);
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({
+      color: p.color, roughness: p.name.includes('acrylic') ? .15 : .55,
+      metalness: /plate|knob-knob|encoder/.test(p.name) ? .45 : .05,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.userData = p;
+    root.add(mesh);
+    meshes.push(mesh);
+  }));
+  meshes.sort((a, b) => a.userData.explode - b.userData.explode);
+  renderList();
+  applyExplode();
+  applyFilter();
+  document.querySelectorAll('#knobs button').forEach(b => b.classList.toggle('on', +b.dataset.n === knobs));
+  return entry;
+}
+
+function renderList() {
+  const ul = $('parts');
+  ul.innerHTML = '';
+  for (const m of [...meshes].reverse()) {     // front to back
+    const p = m.userData;
+    const li = document.createElement('li');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = m.visible;
+    cb.addEventListener('change', () => { m.visible = cb.checked; });
+    const sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = p.color;
+    const label = document.createElement('span'); label.textContent = p.label;
+    const tag = document.createElement('small'); tag.textContent = p.printed ? 'print' : 'buy';
+    li.append(cb, sw, label, tag);
+    m.userData.checkbox = cb;
+    ul.appendChild(li);
+  }
+}
+
+function applyExplode() {
+  const t = $('explode').value / 100;
+  for (const m of meshes) m.position.z = m.userData.explode * t * 1.4;
+}
+function applyFilter() {
+  const only = $('printedOnly').checked;
+  for (const m of meshes) {
+    m.visible = !only || m.userData.printed;
+    if (m.userData.checkbox) m.userData.checkbox.checked = m.visible;
+  }
+}
+
+// ---- Controls ----
+$('explode').value = store.get('explode', 60);
+$('explode').addEventListener('input', () => { applyExplode(); store.set('explode', $('explode').value); });
+$('spin').checked = store.get('spin', '0') === '1';
+$('spin').addEventListener('change', () => store.set('spin', $('spin').checked ? '1' : '0'));
+$('printedOnly').addEventListener('change', applyFilter);
+$('reset').addEventListener('click', () => resetView(manifest?.[String(current)]?.plate_width));
+let current = +store.get('knobs', 1);
+document.querySelectorAll('#knobs button').forEach(b => b.addEventListener('click', async () => {
+  current = +b.dataset.n; store.set('knobs', current);
+  const e = await load(current);
+  resetView(e.plate_width);
+}));
+
+// ---- Go ----
+try {
+  manifest = await (await fetch('models/parts.json')).json();
+  const e = await load(current);
+  resetView(e.plate_width);
+} catch (err) {
+  $('err').hidden = false;
+  $('err').textContent = `Couldn't load the models (${err.message}). Open this page through a web server, e.g. the wallvol demo at /hardware/viewer.html.`;
+}
+
+renderer.setAnimationLoop(() => {
+  controls.autoRotate = $('spin').checked;
+  controls.autoRotateSpeed = 1.2;
+  controls.update();
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>

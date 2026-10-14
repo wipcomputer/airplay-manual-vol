@@ -1,0 +1,425 @@
+{
+  "1": {
+    "plate_width": 114.3,
+    "parts": [
+      {
+        "file": "1k-box.stl",
+        "name": "box",
+        "label": "Electrical box (2-gang old-work)",
+        "color": "#9aa0a6",
+        "explode": -70,
+        "printed": false
+      },
+      {
+        "file": "1k-plate.stl",
+        "name": "plate",
+        "label": "Decora wall plate (any brand)",
+        "color": "#c9ccd0",
+        "explode": 70,
+        "printed": false
+      },
+      {
+        "file": "1k-knob1-strap.stl",
+        "name": "knob1-strap",
+        "label": "Knob 1: printed strap",
+        "color": "#30343a",
+        "explode": 0,
+        "printed": true
+      },
+      {
+        "file": "1k-knob1-bracket.stl",
+        "name": "knob1-bracket",
+        "label": "Knob 1: printed encoder bracket",
+        "color": "#30343a",
+        "explode": -14,
+        "printed": true
+      },
+      {
+        "file": "1k-knob1-encoder.stl",
+        "name": "knob1-encoder",
+        "label": "Knob 1: rotary encoder (PEC11R)",
+        "color": "#b08d57",
+        "explode": -28,
+        "printed": false
+      },
+      {
+        "file": "1k-knob1-face.stl",
+        "name": "knob1-face",
+        "label": "Knob 1: printed face",
+        "color": "#e6e7e9",
+        "explode": 22,
+        "printed": true
+      },
+      {
+        "file": "1k-knob1-knob.stl",
+        "name": "knob1-knob",
+        "label": "Knob 1: knob cap",
+        "color": "#d7dadd",
+        "explode": 92,
+        "printed": false
+      },
+      {
+        "file": "1k-screen-strap.stl",
+        "name": "screen-strap",
+        "label": "Screen: printed strap",
+        "color": "#30343a",
+        "explode": 0,
+        "printed": true
+      },
+      {
+        "file": "1k-screen-housing.stl",
+        "name": "screen-housing",
+        "label": "Screen: printed board housing",
+        "color": "#30343a",
+        "explode": -30,
+        "printed": true
+      },
+      {
+        "file": "1k-screen-board.stl",
+        "name": "screen-board",
+        "label": "Screen: Waveshare ESP32-S3 1.9\" board",
+        "color": "#1f6f4a",
+        "explode": -16,
+        "printed": false
+      },
+      {
+        "file": "1k-screen-face.stl",
+        "name": "screen-face",
+        "label": "Screen: printed face",
+        "color": "#e6e7e9",
+        "explode": 22,
+        "printed": true
+      },
+      {
+        "file": "1k-screen-acrylic.stl",
+        "name": "screen-acrylic",
+        "label": "Screen: black acrylic cover (laser cut)",
+        "color": "#0b0b0b",
+        "explode": 44,
+        "printed": true
+      }
+    ]
+  },
+  "2": {
+    "plate_width": 160.3,
+    "parts": [
+      {
+        "file": "2k-box.stl",
+        "name": "box",
+        "label": "Electrical box (2-gang old-work)",
+        "color": "#9aa0a6",
+        "explode": -70,
+        "printed": false
+      },
+      {
+        "file": "2k-plate.stl",
+        "name": "plate",
+        "label": "Decora wall plate (any brand)",
+        "color": "#c9ccd0",
+        "explode": 70,
+        "printed": false
+      },
+      {
+        "file": "2k-knob1-strap.stl",
+        "name": "knob1-strap",
+        "label": "Knob 1: printed strap",
+        "color": "#30343a",
+        "explode": 0,
+        "printed": true
+      },
+      {
+        "file": "2k-knob1-bracket.stl",
+        "name": "knob1-bracket",
+        "label": "Knob 1: printed encoder bracket",
+        "color": "#30343a",
+        "explode": -14,
+        "printed": true
+      },
+      {
+        "file": "2k-knob1-encoder.stl",
+        "name": "knob1-encoder",
+        "label": "Knob 1: rotary encoder (PEC11R)",
+        "color": "#b08d57",
+        "explode": -28,
+        "printed": false
+      },
+      {
+        "file": "2k-knob1-face.stl",
+        "name": "knob1-face",
+        "label": "Knob 1: printed face",
+        "color": "#e6e7e9",
+        "explode": 22,
+        "printed": true
+      },
+      {
+        "file": "2k-knob1-knob.stl",
+        "name": "knob1-knob",
+        "label": "Knob 1: knob cap",
+        "color": "#d7dadd",
+        "explode": 92,
+        "printed": false
+      },
+      {
+        "file": "2k-knob2-strap.stl",
+        "name": "knob2-strap",
+        "label": "Knob 2: printed strap",
+        "color": "#30343a",
+        "explode": 0,
+        "printed": true
+      },
+      {
+        "file": "2k-knob2-bracket.stl",
+        "name": "knob2-bracket",
+        "label": "Knob 2: printed encoder bracket",
+        "color": "#30343a",
+        "explode": -14,
+        "printed": true
+      },
+      {
+        "file": "2k-knob2-encoder.stl",
+        "name": "knob2-encoder",
+        "label": "Knob 2: rotary encoder (PEC11R)",
+        "color": "#b08d57",
+        "explode": -28,
+        "printed": false
+      },
+      {
+        "file": "2k-knob2-face.stl",
+        "name": "knob2-face",
+        "label": "Knob 2: printed face",
+        "color": "#e6e7e9",
+        "explode": 22,
+        "printed": true
+      },
+      {
+        "file": "2k-knob2-knob.stl",
+        "name": "knob2-knob",
+        "label": "Knob 2: knob cap",
+        "color": "#d7dadd",
+        "explode": 92,
+        "printed": false
+      },
+      {
+        "file": "2k-screen-strap.stl",
+        "name": "screen-strap",
+        "label": "Screen: printed strap",
+        "color": "#30343a",
+        "explode": 0,
+        "printed": true
+      },
+      {
+        "file": "2k-screen-housing.stl",
+        "name": "screen-housing",
+        "label": "Screen: printed board housing",
+        "color": "#30343a",
+        "explode": -30,
+        "printed": true
+      },
+      {
+        "file": "2k-screen-board.stl",
+        "name": "screen-board",
+        "label": "Screen: Waveshare ESP32-S3 1.9\" board",
+        "color": "#1f6f4a",
+        "explode": -16,
+        "printed": false
+      },
+      {
+        "file": "2k-screen-face.stl",
+        "name": "screen-face",
+        "label": "Screen: printed face",
+        "color": "#e6e7e9",
+        "explode": 22,
+        "printed": true
+      },
+      {
+        "file": "2k-screen-acrylic.stl",
+        "name": "screen-acrylic",
+        "label": "Screen: black acrylic cover (laser cut)",
+        "color": "#0b0b0b",
+        "explode": 44,
+        "printed": true
+      }
+    ]
+  },
+  "3": {
+    "plate_width": 206.4,
+    "parts": [
+      {
+        "file": "3k-box.stl",
+        "name": "box",
+        "label": "Electrical box (2-gang old-work)",
+        "color": "#9aa0a6",
+        "explode": -70,
+        "printed": false
+      },
+      {
+        "file": "3k-plate.stl",
+        "name": "plate",
+        "label": "Decora wall plate (any brand)",
+        "color": "#c9ccd0",
+        "explode": 70,
+        "printed": false
+      },
+      {
+        "file": "3k-knob1-strap.stl",
+        "name": "knob1-strap",
+        "label": "Knob 1: printed strap",
+        "color": "#30343a",
+        "explode": 0,
+        "printed": true
+      },
+      {
+        "file": "3k-knob1-bracket.stl",
+        "name": "knob1-bracket",
+        "label": "Knob 1: printed encoder bracket",
+        "color": "#30343a",
+        "explode": -14,
+        "printed": true
+      },
+      {
+        "file": "3k-knob1-encoder.stl",
+        "name": "knob1-encoder",
+        "label": "Knob 1: rotary encoder (PEC11R)",
+        "color": "#b08d57",
+        "explode": -28,
+        "printed": false
+      },
+      {
+        "file": "3k-knob1-face.stl",
+        "name": "knob1-face",
+        "label": "Knob 1: printed face",
+        "color": "#e6e7e9",
+        "explode": 22,
+        "printed": true
+      },
+      {
+        "file": "3k-knob1-knob.stl",
+        "name": "knob1-knob",
+        "label": "Knob 1: knob cap",
+        "color": "#d7dadd",
+        "explode": 92,
+        "printed": false
+      },
+      {
+        "file": "3k-knob2-strap.stl",
+        "name": "knob2-strap",
+        "label": "Knob 2: printed strap",
+        "color": "#30343a",
+        "explode": 0,
+        "printed": true
+      },
+      {
+        "file": "3k-knob2-bracket.stl",
+        "name": "knob2-bracket",
+        "label": "Knob 2: printed encoder bracket",
+        "color": "#30343a",
+        "explode": -14,
+        "printed": true
+      },
+      {
+        "file": "3k-knob2-encoder.stl",
+        "name": "knob2-encoder",
+        "label": "Knob 2: rotary encoder (PEC11R)",
+        "color": "#b08d57",
+        "explode": -28,
+        "printed": false
+      },
+      {
+        "file": "3k-knob2-face.stl",
+        "name": "knob2-face",
+        "label": "Knob 2: printed face",
+        "color": "#e6e7e9",
+        "explode": 22,
+        "printed": true
+      },
+      {
+        "file": "3k-knob2-knob.stl",
+        "name": "knob2-knob",
+        "label": "Knob 2: knob cap",
+        "color": "#d7dadd",
+        "explode": 92,
+        "printed": false
+      },
+      {
+        "file": "3k-knob3-strap.stl",
+        "name": "knob3-strap",
+        "label": "Knob 3: printed strap",
+        "color": "#30343a",
+        "explode": 0,
+        "printed": true
+      },
+      {
+        "file": "3k-knob3-bracket.stl",
+        "name": "knob3-bracket",
+        "label": "Knob 3: printed encoder bracket",
+        "color": "#30343a",
+        "explode": -14,
+        "printed": true
+      },
+      {
+        "file": "3k-knob3-encoder.stl",
+        "name": "knob3-encoder",
+        "label": "Knob 3: rotary encoder (PEC11R)",
+        "color": "#b08d57",
+        "explode": -28,
+        "printed": false
+      },
+      {
+        "file": "3k-knob3-face.stl",
+        "name": "knob3-face",
+        "label": "Knob 3: printed face",
+        "color": "#e6e7e9",
+        "explode": 22,
+        "printed": true
+      },
+      {
+        "file": "3k-knob3-knob.stl",
+        "name": "knob3-knob",
+        "label": "Knob 3: knob cap",
+        "color": "#d7dadd",
+        "explode": 92,
+        "printed": false
+      },
+      {
+        "file": "3k-screen-strap.stl",
+        "name": "screen-strap",
+        "label": "Screen: printed strap",
+        "color": "#30343a",
+        "explode": 0,
+        "printed": true
+      },
+      {
+        "file": "3k-screen-housing.stl",
+        "name": "screen-housing",
+        "label": "Screen: printed board housing",
+        "color": "#30343a",
+        "explode": -30,
+        "printed": true
+      },
+      {
+        "file": "3k-screen-board.stl",
+        "name": "screen-board",
+        "label": "Screen: Waveshare ESP32-S3 1.9\" board",
+        "color": "#1f6f4a",
+        "explode": -16,
+        "printed": false
+      },
+      {
+        "file": "3k-screen-face.stl",
+        "name": "screen-face",
+        "label": "Screen: printed face",
+        "color": "#e6e7e9",
+        "explode": 22,
+        "printed": true
+      },
+      {
+        "file": "3k-screen-acrylic.stl",
+        "name": "screen-acrylic",
+        "label": "Screen: black acrylic cover (laser cut)",
+        "color": "#0b0b0b",
+        "explode": 44,
+        "printed": true
+      }
+    ]
+  }
+}

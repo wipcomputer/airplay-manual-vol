@@ -1,0 +1,5 @@
+pyatv==0.18.0
+soco==0.31.5
+aiohttp>=3.9
+zeroconf>=0.130
+paho-mqtt>=2.1

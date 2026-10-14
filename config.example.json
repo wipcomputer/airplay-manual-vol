@@ -1,0 +1,24 @@
+{
+  "speakers": [
+    {
+      "id": "living-room",
+      "room": "Living Room",
+      "driver": "homepod",
+      "host": "192.168.1.43",
+      "credentials": "credentials/homepod-living-room.txt",
+      "password": "your-airplay-password"
+    },
+    {
+      "id": "bedroom",
+      "room": "Bedroom",
+      "driver": "sonos",
+      "host": "192.168.1.172"
+    },
+    {
+      "id": "den",
+      "room": "Den",
+      "driver": "syng",
+      "host": "192.168.1.120"
+    }
+  ]
+}

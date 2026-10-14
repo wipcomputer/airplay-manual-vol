@@ -1,0 +1,35 @@
+# Pairing credentials are long-term keys for a speaker; never commit them
+credentials*.txt
+*_creds.txt
+.venv/
+venv/
+__pycache__/
+.DS_Store
+
+# Local / editor
+*.pyc
+.env
+*.log
+Terminal Saved Output*.txt
+.idea/
+.vscode/
+
+# Local speaker config and pairing keys
+config.json
+credentials/
+*.egg-info/
+build/
+dist/
+
+# ESP-IDF build output and local config
+firmware/build/
+firmware/sdkconfig
+firmware/sdkconfig.old
+firmware/managed_components/
+firmware/dependencies.lock
+.venv-cad/
+
+wallvol/matter/node_modules/
+
+# Matter fabric and keys (created by the bridge in the settings folder)
+/matter/

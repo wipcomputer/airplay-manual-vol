@@ -1,0 +1,6 @@
+dependencies:
+  idf: ">=5.5"
+  lvgl/lvgl: "~9.3.0"
+  espressif/esp_lvgl_port: "^2.4.0"
+  espressif/esp_lcd_touch_cst816s: "^1.0.6"
+  espressif/esp_websocket_client: "^1.4.0"

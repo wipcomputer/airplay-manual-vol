@@ -1,0 +1,133 @@
+menu "Wall Volume Panel"
+
+    menu "Wi-Fi (temporary: replaced by Bluetooth setup from the iPhone app)"
+        config WVP_WIFI_SSID
+            string "Wi-Fi network name"
+            default ""
+        config WVP_WIFI_PASSWORD
+            string "Wi-Fi password"
+            default ""
+    endmenu
+
+    menu "Knobs and devices (temporary: replaced by setup from the iPhone app)"
+        config WVP_KNOB_COUNT
+            int "Number of knobs (1-3, plus one screen)"
+            range 1 3
+            default 1
+
+        config WVP_KNOB1_DRIVER
+            string "Knob 1 driver (sonos, syng, huum)"
+            default "sonos"
+        config WVP_KNOB1_HOST
+            string "Knob 1 device: IP address (Syng: the primary Cell; huum: email:password)"
+            default ""
+        config WVP_KNOB1_NAME
+            string "Knob 1 name on screen"
+            default "LIVING ROOM"
+
+        config WVP_KNOB2_DRIVER
+            string "Knob 2 driver"
+            default "sonos"
+            depends on WVP_KNOB_COUNT >= 2
+        config WVP_KNOB2_HOST
+            string "Knob 2 device IP address"
+            default ""
+            depends on WVP_KNOB_COUNT >= 2
+        config WVP_KNOB2_NAME
+            string "Knob 2 name on screen"
+            default "DEN"
+            depends on WVP_KNOB_COUNT >= 2
+
+        config WVP_KNOB3_DRIVER
+            string "Knob 3 driver"
+            default "sonos"
+            depends on WVP_KNOB_COUNT >= 3
+        config WVP_KNOB3_HOST
+            string "Knob 3 device IP address"
+            default ""
+            depends on WVP_KNOB_COUNT >= 3
+        config WVP_KNOB3_NAME
+            string "Knob 3 name on screen"
+            default "BEDROOM"
+            depends on WVP_KNOB_COUNT >= 3
+    endmenu
+
+    config WVP_UNLOCK_KEY
+        string "iPhone unlock key, 64 hex digits (development; empty = generate and log one)"
+        default ""
+
+    menu "Pins (VERIFY against Waveshare's schematic before wiring)"
+        comment "Display: ST7789V2, 170x320, SPI"
+        config WVP_LCD_MOSI
+            int "LCD MOSI (SDA)"
+            default 13
+        config WVP_LCD_SCLK
+            int "LCD SCLK"
+            default 10
+        config WVP_LCD_CS
+            int "LCD CS"
+            default 12
+        config WVP_LCD_DC
+            int "LCD DC"
+            default 11
+        config WVP_LCD_RST
+            int "LCD RESET (-1 if none)"
+            default 9
+        config WVP_LCD_BL
+            int "LCD backlight"
+            default 14
+        config WVP_LCD_X_GAP
+            int "LCD column offset (170-wide ST7789 panels usually need 35)"
+            default 35
+        config WVP_LCD_Y_GAP
+            int "LCD row offset"
+            default 0
+
+        comment "Touch: CST816, I2C"
+        config WVP_TP_SDA
+            int "Touch SDA"
+            default 47
+        config WVP_TP_SCL
+            int "Touch SCL"
+            default 48
+        config WVP_TP_INT
+            int "Touch INT (-1 if not wired)"
+            default -1
+        config WVP_TP_RST
+            int "Touch RESET (-1 if not wired)"
+            default -1
+
+        comment "Encoders: A, B and push switch per knob (switch to GND, internal pull-ups)"
+        config WVP_ENC1_A
+            int "Knob 1 A"
+            default 4
+        config WVP_ENC1_B
+            int "Knob 1 B"
+            default 5
+        config WVP_ENC1_SW
+            int "Knob 1 push switch"
+            default 6
+        config WVP_ENC2_A
+            int "Knob 2 A"
+            default 15
+        config WVP_ENC2_B
+            int "Knob 2 B"
+            default 16
+        config WVP_ENC2_SW
+            int "Knob 2 push switch"
+            default 17
+        config WVP_ENC3_A
+            int "Knob 3 A"
+            default 18
+        config WVP_ENC3_B
+            int "Knob 3 B"
+            default 21
+        config WVP_ENC3_SW
+            int "Knob 3 push switch"
+            default 38
+        config WVP_ENC_STEPS_PER_DETENT
+            int "Encoder quadrature steps per detent (EC11/PEC11R: 4)"
+            default 4
+    endmenu
+
+endmenu

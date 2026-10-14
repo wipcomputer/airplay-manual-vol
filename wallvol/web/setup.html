@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Panel Setup</title>
+<style>
+  /* Stands in for the iOS App Clip that a buyer gets by scanning the panel */
+  :root {
+    --bg: #f2f2f7; --card: #ffffff; --text: #1c1c1e; --muted: #6e6e73; --line: #d1d1d6;
+    --accent: #0a84ff; --red: #dc3a2f;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #000; --card: #1c1c1e; --text: #f2f2f7; --muted: #98989d; --line: #38383a; }
+  }
+  :root[data-theme="dark"] { --bg: #000; --card: #1c1c1e; --text: #f2f2f7; --muted: #98989d; --line: #38383a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 16px/1.4 var(--font); display: flex; flex-direction: column; }
+  main { flex: 1; min-height: 0; overflow-y: auto; padding: 66px 18px 18px;   /* clears the Dynamic Island */ display: flex; flex-direction: column; gap: 14px; }
+  main > * { flex-shrink: 0; min-width: 0; }   /* scroll, never squash cards */
+  footer:has(.primary[hidden]) { display: none; }
+  h1 { font-size: 26px; margin: 8px 0 2px; letter-spacing: -.01em; }
+  p { margin: 0; color: var(--muted); font-size: 15px; }
+  .step { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .hero { display: flex; justify-content: center; padding: 18px 0 6px; }
+  .mini-plate { width: 120px; aspect-ratio: 1; border-radius: 6px; background: linear-gradient(180deg, #e3e5e7, #c3c6c9); position: relative; box-shadow: 0 8px 20px rgba(0,0,0,.15); }
+  .mini-plate .k { position: absolute; left: 22%; top: 50%; width: 30px; height: 30px; transform: translate(-50%, -50%); margin-left: 9px; border-radius: 50%; background: repeating-conic-gradient(#f4f5f6 0 6deg, #9a9ea2 6deg 12deg); }
+  .mini-plate .s { position: absolute; right: 16%; top: 50%; width: 26px; height: 52px; transform: translateY(-50%); background: #0a0a0a; border-radius: 2px; }
+  .section { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 8px 4px -8px; }
+  .list { background: var(--card); border-radius: 12px; overflow: hidden; min-width: 0; }
+  /* the demo devices open in their own block: same spacing as the page (the heading's
+     negative margin relies on the 14 px gap) */
+  #demoList:not([hidden]) { display: flex; flex-direction: column; gap: 14px; }
+  /* no button at the bottom: keep the last card clear of the screen's rounded corner */
+  body:has(#next[hidden]) main { padding-bottom: 44px; }
+  .item { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 9px 12px; border: 0;
+          background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; position: relative; }
+  .item + .item::before { content: ""; position: absolute; top: 0; left: 56px; right: 0; border-top: 1px solid var(--line); }
+  .item:active { background: var(--line); }
+  .item:disabled { cursor: default; color: inherit; opacity: 1; }
+  .item:disabled:active { background: none; }
+  .item .ico { width: 32px; height: 32px; border-radius: 8px; flex: none; display: grid; place-items: center; color: #fff; }
+  .item .ico svg { width: 19px; height: 19px; }
+  .item .name { flex: 1; min-width: 0; font-size: 16px; }
+  .item .name small { display: block; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badge { font-size: 13px; color: var(--muted); white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+  .chev { color: var(--line); font-size: 20px; line-height: 1; }
+  .field { background: var(--card); border-radius: 12px; padding: 4px 14px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); padding-top: 8px; }
+  .field input { width: 100%; border: 0; background: none; color: inherit; font: inherit; padding: 4px 0 10px; outline: none; }
+  .note { font-size: 13px; }
+  .error { color: var(--red); font-size: 14px; }
+  footer { padding: 12px 18px 28px; }
+  .primary { width: 100%; padding: 15px; border: 0; border-radius: 14px; background: var(--accent); color: #fff; font: 600 17px var(--font); cursor: pointer; }
+  .primary:disabled { opacity: .5; cursor: default; }
+  .spinner { width: 22px; height: 22px; border: 2.5px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .done { font-size: 54px; text-align: center; color: #30d158; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main id="main"></main>
+<footer><button class="primary" id="next">Continue</button></footer>
+<script src="/api.js"></script>
+<script>
+const BRAND = { homepod: 'HomePod', sonos: 'Sonos', syng: 'Syng' };
+const $ = id => document.getElementById(id);
+const main = $('main'), next = $('next');
+const flow = { speakers: null, choice: null, askPassword: false };
+const QS = new URLSearchParams(location.search);
+const ADDING = QS.get('mode') === 'add';   // panel already set up
+const KNOB = +(QS.get('knob') || 0);       // which knob the new device is for
+const STEPS = ADDING ? 2 : 3;
+const stepLabel = n => `Step ${ADDING ? n - 1 : n} of ${STEPS}`;
+const PANEL = new URLSearchParams(location.search).get('panel') || 'panel-1';
+const P = `/api/panels/${encodeURIComponent(PANEL)}`;
+// The panel hands this iPhone a secret unlock key at setup (Keychain in the
+// real app; this browser's storage in the demo). Used by /unlock.
+function keepKey(r) {
+  if (r && r.unlock_key) try { localStorage.setItem(`wallvol.key.${PANEL}`, r.unlock_key); } catch {}
+}
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) } : {});
+  const j = await r.json();
+  if (!r.ok || j.ok === false) throw Object.assign(new Error(j.error || `HTTP ${r.status}`), { needPassword: !!j.need_password });
+  return j;
+}
+function show(html, button, onNext) {
+  main.innerHTML = html;
+  next.hidden = !button;
+  next.disabled = false;
+  next.textContent = button || '';
+  next.onclick = onNext;
+}
+
+// 1. The App Clip card, found over Bluetooth
+function intro() {
+  show(`<div class="hero"><div class="mini-plate"><div class="k"></div><div class="s"></div></div></div>
+    <div class="step">Wall Volume Panel</div>
+    <h1>Set up your panel</h1>
+    <p>The panel is close by. Setup takes about a minute: it joins your Wi-Fi, then you choose what it controls.</p>`,
+    'Continue', wifi);
+}
+
+// 2. Wi-Fi handoff (the phone sends its network to the panel over Bluetooth)
+async function wifi() {
+  next.disabled = true;
+  try { await api(`${P}/setup/begin`, {}); } catch {}
+  show(`<div class="step">Step 1 of 3</div>
+    <h1>Wi-Fi</h1>
+    <p>The panel will join the same Wi-Fi network as this iPhone. You won't need to type the password.</p>
+    <div class="list">${row(ICONS.wifi, 'Your home network', 'Shared from this iPhone', '✓', 'disabled')}</div>
+    <p class="note">In this prototype the computer running the server is already on your network, so this step is simulated.</p>`,
+    'Join Network', scan);
+}
+
+// 3. Pick a device: network scan, add by code/account, or demo devices
+async function scan() {
+  show(`<div class="step">${stepLabel(2)}</div>
+    <h1>${ADDING ? 'Add a device' : 'Choose a device'}</h1>
+    <p>Looking for devices on your network…</p>
+    <div class="spinner" style="margin-top:24px"></div>`, null);
+  try {
+    flow.speakers = await api(`${P}/setup/scan`);
+  } catch (e) {
+    show(`<div class="step">${stepLabel(2)}</div><h1>${ADDING ? 'Add a device' : 'Choose a device'}</h1><p class="error">${esc(e.message)}</p>`, 'Try Again', scan);
+    return;
+  }
+  if (!flow.speakers.length) {
+    show(`<div class="step">${stepLabel(2)}</div><h1>No devices found</h1>
+      <p>Make sure your devices are on and on this network.</p>`, 'Scan Again', scan);
+    return;
+  }
+  // Group the scan: already in this home, found on the network, demo devices
+  const rows = (list) => list.map(({ s, i }) => row(iconFor(s.driver), s.name,
+      [s.brand || BRAND[s.driver] || s.driver, s.simulated ? '' : s.host].filter(Boolean).join(' · '),
+      s.set_up ? 'Set up' : s.needs_password && !s.password_saved ? 'Password' : '', `data-i="${i}"`)).join('');
+  const all = flow.speakers.map((s, i) => ({ s, i }));
+  const inHome = all.filter(x => x.s.set_up);
+  const network = all.filter(x => !x.s.set_up && !x.s.simulated);
+  const demo = all.filter(x => !x.s.set_up && x.s.simulated);
+  show(`<div class="step">${stepLabel(2)}</div>
+    <h1>${ADDING ? 'Add a device' : 'Choose a device'}</h1>
+    <p>For knob ${KNOB + 1}${ADDING ? '' : '. You can add more later'}.</p>
+    ${inHome.length ? `<div class="section">In your home</div><div class="list">${rows(inHome)}</div>` : ''}
+    ${network.length ? `<div class="section">On your network</div><div class="list">${rows(network)}</div>` : ''}
+    <div class="section">Add by code or account</div>
+    <div class="list">
+      ${row(ICONS.plug, 'Matter device', 'Plugs, lights, dimmers · pairing code', '', 'id="addMatter"')}
+      ${row(ICONS.sauna, 'HUUM sauna', 'Sign in with your HUUM account', '', 'id="addHuum"')}
+      ${row(ICONS.grill, 'Traeger grill', 'Sign in with your Traeger account', '', 'id="addTraeger"')}
+    </div>
+    ${demo.length ? `<div class="list" id="demoToggle">${row(ICONS.demo, 'Show demo devices', 'Simulated sauna, grill and lights, to try the panel without them', '', 'id="showDemo"')}</div>
+      <div id="demoList" hidden><div class="section">Demo devices (simulated)</div><div class="list">${rows(demo)}</div></div>` : ''}`, null);
+  main.querySelectorAll('.item[data-i]').forEach(b => b.onclick = () => { flow.choice = flow.speakers[+b.dataset.i]; flow.askPassword = false; name(); });
+  $('addMatter').onclick = () => matter();
+  if ($('showDemo')) $('showDemo').onclick = () => { $('demoToggle').hidden = true; $('demoList').hidden = false; };
+  $('addHuum').onclick = () => account('huum');
+  $('addTraeger').onclick = () => account('traeger');
+}
+
+// List rows: a coloured icon, name, one subtitle line, an optional badge
+const ICON_SVG = {
+  speaker: '<path d="M7 3h10a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><circle cx="12" cy="14" r="3.2"/><circle cx="12" cy="7" r="1"/>',
+  plug: '<path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/>',
+  bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>',
+  sauna: '<path d="M8 4c-1 1.5 1 2.5 0 4M12 4c-1 1.5 1 2.5 0 4M16 4c-1 1.5 1 2.5 0 4M4 12h16v8H4z"/>',
+  demo: '<path d="M5 4h14v16H5zM9 8h6M9 12h6M9 16h3"/>',
+  wifi: '<path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/>',
+  grill: '<path d="M4 10h16a8 8 0 0 1-16 0zM8 18l-2 3M16 18l2 3M9 4c-.8 1.2.8 2 0 3.2M13 4c-.8 1.2.8 2 0 3.2"/>',
+};
+const ico = (name, color) => ({ svg: ICON_SVG[name], color });
+const ICONS = { demo: ico('demo', '#8e8e93'), wifi: ico('wifi', '#0a84ff'), speaker: ico('speaker', '#5e5ce6'), plug: ico('plug', '#30b0c7'), bulb: ico('bulb', '#ff9f0a'),
+                sauna: ico('sauna', '#ff6b3d'), grill: ico('grill', '#8e8e93') };
+function iconFor(driver) {
+  if (/sauna|huum/.test(driver)) return ICONS.sauna;
+  if (/grill|traeger/.test(driver)) return ICONS.grill;
+  if (/dimmer/.test(driver)) return ICONS.bulb;
+  if (/light|switch|matter/.test(driver)) return ICONS.plug;
+  return ICONS.speaker;
+}
+function row(icon, title, subtitle, badge, attrs) {
+  return `<button class="item" ${attrs}>
+    <span class="ico" style="background:${icon.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${icon.svg}</svg></span>
+    <span class="name">${esc(title)}<small>${esc(subtitle)}</small></span>
+    <span class="badge">${esc(badge)}<span class="chev">›</span></span></button>`;
+}
+
+// Cloud accounts (HUUM sauna). The login is checked once and kept only in the
+// local settings on this computer (the real product: on the panel).
+const ACCOUNTS = {
+  huum: { title: 'Connect a HUUM sauna', app: 'HUUM', name: 'Sauna', example: 'Crane Sauna',
+          about: 'The knob sets the target temperature; a long press on the screen starts or stops the sauna, and a ring counts down the session. It won\'t start while the sauna door is open.' },
+  traeger: { title: 'Connect a Traeger grill', app: 'Traeger', name: 'Grill', example: 'Backyard Grill',
+             about: 'The panel shows the grill and probe temperatures and can change the set temperature while the grill is cooking. For safety it never starts or shuts down the grill.' },
+};
+function account(service, error, user = '', label = '') {
+  const a = ACCOUNTS[service];
+  show(`<div class="step">${stepLabel(3)}</div>
+    <h1>${a.title}</h1>
+    <p>Sign in with the email and password you use in the ${a.app} app. ${a.about}</p>
+    <div class="field"><label for="auser">Email</label><input id="auser" type="email" autocomplete="username" value="${esc(user)}"></div>
+    <div class="field"><label for="apass">Password</label><input id="apass" type="password" autocomplete="current-password"></div>
+    <div class="field"><label for="aname">Name</label><input id="aname" maxlength="20" autocomplete="off" placeholder="e.g. ${esc(a.example)}" value="${esc(label)}"></div>
+    <p class="note">Use the name it has in the ${a.app} app, so it's the same everywhere.</p>
+    <p class="note">Your login stays on this computer (in the panel's local settings) and is only sent to ${a.app}.</p>
+    ${error ? `<p class="error">${esc(error)}</p>` : ''}`, 'Sign In', () => accountFinish(service));
+}
+async function accountFinish(service) {
+  const user = $('auser').value.trim(), pass = $('apass').value, label = $('aname').value.trim() || ACCOUNTS[service].name;
+  if (!user || !pass) { account(service, 'Enter your email and password.', user, label); return; }
+  next.disabled = true; next.textContent = 'Signing in…';
+  let r;
+  try { r = await api(`${P}/setup/account`, { service, username: user, password: pass, name: label, knob: KNOB }); keepKey(r); }
+  catch (e) { account(service, e.message, user, label); return; }
+  show(`<div class="done">✓</div>
+    <h1 style="text-align:center">${esc(r.devices[0])} is ready</h1>
+    <p style="text-align:center">${service === 'traeger' ? 'Turn the knob to change the set temperature while the grill is cooking.' : 'Turn the knob to set the temperature. Hold the knob, or the ring on the screen, to start or stop it.'}</p>`, null);
+}
+
+// Settings → Name on the panel: typing happens here on the iPhone, not with the knob
+async function rename(error = '') {
+  const id = QS.get('device');
+  let name = '';
+  try {
+    const j = await (await fetch('/api/panels')).json();
+    const p = j.panels.find(x => x.id === PANEL) || j.panels[0];
+    name = ((p.devices || []).find(d => d.id === id) || {}).room || '';
+  } catch {}
+  show(`<h1>Name</h1>
+    <p>The name shown on every panel in your home. Use the name it has in the maker's app, so it's the same everywhere.</p>
+    <div class="field"><label for="rname">Name</label><input id="rname" maxlength="24" autocomplete="off" value="${esc(name)}"></div>
+    ${error ? `<p class="error">${esc(error)}</p>` : ''}`, 'Save', async () => {
+    const value = $('rname').value.trim();
+    if (!value) { rename('Enter a name.'); return; }
+    next.disabled = true;
+    try { await api(`/api/devices/${encodeURIComponent(id)}/rename`, { name: value }); }
+    catch (e) { rename(e.message); return; }
+    show(`<div class="done">✓</div><h1 style="text-align:center">Renamed to ${esc(value)}</h1>`, null);
+  });
+}
+
+// Matter: a pairing code from the Home app adds the device alongside Apple Home
+function matter(error, code = '', label = '') {
+  show(`<div class="step">${stepLabel(3)}</div>
+    <h1>Add a Matter device</h1>
+    <p>In the Home app, open the device, go to its settings and tap <b>Turn On Pairing Mode</b>. Type the code it shows. The device stays in Apple Home; the panel joins as a second controller.</p>
+    <div class="field"><label for="mcode">Pairing code</label><input id="mcode" inputmode="numeric" autocomplete="off" placeholder="1234-567-8901" value="${esc(code)}"></div>
+    <div class="field"><label for="mname">Name</label><input id="mname" maxlength="20" autocomplete="off" placeholder="Outside Light" value="${esc(label)}"></div>
+    <p class="note">A plug with two outlets becomes two devices (Outside Light 1 and 2). Codes expire after about 15 minutes.</p>
+    ${error ? `<p class="error">${esc(error)}</p>` : ''}`, 'Add Device', matterFinish);
+}
+async function matterFinish() {
+  const code = $('mcode').value, label = $('mname').value.trim() || 'Matter device';
+  if (code.replace(/[^0-9]/g, '').length < 11) { matter('Enter the 11-digit pairing code.', code, label); return; }
+  next.disabled = true;
+  next.textContent = 'Adding… (up to a minute)';
+  let r;
+  try { r = await api(`${P}/setup/matter`, { code, name: label, knob: KNOB }); keepKey(r); }
+  catch (e) { matter(e.message, code, label); return; }
+  show(`<div class="done">✓</div>
+    <h1 style="text-align:center">${esc(r.devices.join(' and '))} ${r.devices.length > 1 ? 'are' : 'is'} ready</h1>
+    <p style="text-align:center">Turn the knob to control it. Triple-click a knob to switch devices or add another.</p>`, null);
+}
+
+// 4. Name the room, and pair if it's a HomePod with an AirPlay password
+const needsTyping = () => flow.choice.needs_password && (!flow.choice.password_saved || flow.askPassword);
+function name(error) {
+  const s = flow.choice;
+  show(`<div class="step">${stepLabel(3)}</div>
+    <h1>${esc(s.name)}</h1>
+    <p>The name shows at the top of the panel's screen.</p>
+    <div class="field"><label for="room">Name</label><input id="room" maxlength="24" value="${esc(s.room)}" autocomplete="off"></div>
+    ${needsTyping() ? `
+      <div class="field"><label for="pw">AirPlay password</label><input id="pw" type="password" autocomplete="off"></div>
+      <p class="note">${flow.askPassword ? 'The saved password didn\'t work. Maybe it was changed in the Home app. ' : ''}Your Apple Home's AirPlay password (Home app → Home Settings → Speakers & TV). You enter it once; other HomePods in this home use it automatically. Wrong passwords make the HomePod refuse pairing for longer each time, so check it first.</p>`
+      : s.needs_password ? `<p class="note">Uses your home's saved AirPlay password.</p>` : ''}
+    ${error ? `<p class="error">${esc(error)}</p>` : ''}`,
+    'Finish Setup', finish);
+}
+
+async function finish() {
+  const room = $('room').value.trim() || flow.choice.room;
+  const password = needsTyping() ? $('pw').value : undefined;
+  if (needsTyping() && !password) { name('Enter the AirPlay password.'); return; }
+  next.disabled = true;
+  next.textContent = flow.choice.needs_password ? 'Pairing…' : 'Saving…';
+  try {
+    keepKey(await api(`${P}/setup/finish`, { speaker: flow.choice.id, room, password, knob: KNOB }));
+  } catch (e) {
+    flow.choice.room = room;
+    if (e.needPassword) flow.askPassword = true;
+    name(e.message);
+    return;
+  }
+  show(`<div class="done">✓</div>
+    <h1 style="text-align:center">${esc(room)} is ready</h1>
+    <p style="text-align:center">Turn the knob to control it. Triple-click a knob to switch devices or add another.</p>`, null);
+}
+
+// "+ Add sauna" on the panel opens straight on that account's sign-in
+if (QS.get('mode') === 'rename') rename();
+else if (ADDING && ACCOUNTS[QS.get('kind')]) account(QS.get('kind')); else if (ADDING) scan(); else intro();
+</script>
+</body>
+</html>

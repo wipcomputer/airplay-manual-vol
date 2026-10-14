@@ -1,0 +1,1446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wall Volume Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&display=swap">
+<style>
+  /* Look follows docs/design (Model 01 mockups) */
+  :root {
+    --bg: #d6d7d9;
+    --text: #1d1d1f;
+    --muted-text: #6b6d70;
+    --line: #b4b6b9;
+    --plate: #cfd2d5;
+    --glass: #0a0a0a;
+    --red: #dc3a2f;
+    --font: "Jost", Futura, "Century Gothic", "Avenir Next", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1c1d1f; --text: #e8e8e6; --muted-text: #96989b; --line: #44464a; }
+  }
+  :root[data-theme="dark"] { --bg: #1c1d1f; --text: #e8e8e6; --muted-text: #96989b; --line: #44464a; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font); font-weight: 400;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 32px 16px 48px; gap: 26px; -webkit-user-select: none; user-select: none;
+  }
+  .caption { font-size: 13px; letter-spacing: .24em; text-transform: uppercase; color: var(--muted-text); text-align: center; line-height: 1.8; }
+  .caption b { color: var(--text); font-weight: 500; margin-right: 1.2em; }
+
+  /* Plate: 1 unit = 1 mm. Two-gang plate ~114 mm, Decora openings 33 x 67 mm.
+     --mm (px per mm) is set by the size controls; the plate never overflows the window. */
+  .plate {
+    --w: 114.3;   /* plate width in mm: 114.3 (2-gang), 160.3 (3-gang), 206.4 (4-gang) */
+    --u: min(var(--mm, 7.35px), (100vw - 32px) / (var(--w) + 2));
+    width: calc(var(--w) * var(--u)); height: calc(114.3 * var(--u)); position: relative;
+    border-radius: calc(1.6 * var(--u));
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,.22) 0 1px, rgba(0,0,0,.05) 1px 3px),
+      linear-gradient(180deg, #dfe1e3, var(--plate) 60%, #c4c7ca);
+    box-shadow: 0 calc(6 * var(--u)) calc(12 * var(--u)) rgba(0,0,0,.18), 0 1px 2px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.8);
+  }
+  .screw {
+    position: absolute; width: calc(6 * var(--u)); aspect-ratio: 1; border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle at 40% 35%, #fdfdfd, #c9ccce 60%, #9a9ea2);
+    box-shadow: 0 calc(.6 * var(--u)) calc(1 * var(--u)) rgba(0,0,0,.25);
+    transition: transform .25s ease-out;   /* no pointer cursor: the unscrew is an easter egg */
+  }
+  .screw.out { transition: transform .9s cubic-bezier(.4, 0, .9, .6); }   /* the last turn spins it out */
+  .screw::after { content: ""; position: absolute; left: 22%; right: 22%; top: 46%; height: 9%; background: #6f7377; border-radius: 1px; }
+  .insert {
+    position: absolute; top: 50%; width: calc(33 * var(--u)); height: calc(60.5 * var(--u));
+    transform: translate(-50%, -50%);
+    border: 1px solid rgba(0,0,0,.08); border-radius: calc(.8 * var(--u));
+    background: linear-gradient(180deg, rgba(255,255,255,.25), rgba(255,255,255,.08));
+    display: flex; align-items: center; justify-content: center;
+  }
+  .insert.left { left: 31%; } .insert.right { left: 69%; border: 0; background: none; }
+  .knob.focus .face { box-shadow: 0 0 0 1px rgba(255,255,255,.7), inset 0 0 calc(1.5 * var(--u)) rgba(0,0,0,.15), 0 0 0 calc(.6 * var(--u)) rgba(255,255,255,.0); }
+  /* "KNOB n" under the name, when the panel has more than one knob */
+  .kdots, .setup .knoblabel { position: absolute; top: 15%; left: 0; right: 0; text-align: center;
+           font-size: 4.6cqw; letter-spacing: .3em; text-indent: .3em; color: rgba(255,255,255,.5); }
+  .reading { position: absolute; left: 0; right: 0; top: 72.5%; text-align: center; font-size: 4.6cqw;
+             letter-spacing: .22em; text-indent: .22em; color: rgba(255,255,255,.6); white-space: nowrap; }
+  .display.switch .reading { top: 62%; }
+  .unit { font-size: .38em; margin-left: .06em; vertical-align: .9em; font-weight: 400; }
+  .display.switch .track, .display.switch .mute { display: none; }
+  .display.switch .number { right: 0; left: 0; text-align: center; font-size: 22cqw; letter-spacing: .08em; bottom: 42%; }
+
+  /* Knob: knurled ring around a spun-metal face, ~20 mm */
+  .knob {
+    width: calc(19.5 * var(--u)); aspect-ratio: 1; border-radius: 50%; position: relative;
+    cursor: grab; touch-action: none; outline: none;
+    box-shadow: 0 calc(2.5 * var(--u)) calc(4 * var(--u)) rgba(0,0,0,.28);
+  }
+  .knob:focus-visible { box-shadow: 0 0 0 3px #4c8dff, 0 calc(2.5 * var(--u)) calc(4 * var(--u)) rgba(0,0,0,.28); }
+  .knob:active { cursor: grabbing; }
+  .knob.pressed { transform: scale(.965); box-shadow: 0 calc(1 * var(--u)) calc(2 * var(--u)) rgba(0,0,0,.3); }
+  .knob { transition: transform .08s, box-shadow .08s; }
+  .knurl, .face { transition: transform .12s ease-out; }
+  .knurl {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: repeating-conic-gradient(#f4f5f6 0 2.2deg, #8f9397 2.2deg 4deg);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.18);
+  }
+  .face {
+    position: absolute; inset: 9%; border-radius: 50%;
+    background:
+      conic-gradient(from 20deg, #eceeef, #a9adb1, #f5f6f7, #b2b6ba, #e9ebec, #a3a7ab, #f2f3f4, #aeb2b6, #eceeef);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.7), inset 0 0 calc(1.5 * var(--u)) rgba(0,0,0,.15);
+  }
+  .knob svg.hold { position: absolute; inset: calc(-2.4 * var(--u)); width: calc(100% + 4.8 * var(--u)); height: calc(100% + 4.8 * var(--u)); pointer-events: none; transform: rotate(-90deg); }
+  .knob svg.hold circle { fill: none; stroke: var(--red); stroke-width: 2; stroke-dasharray: 100; stroke-dashoffset: 100; opacity: 0; }
+  .knob svg.hold circle.filling { opacity: 1; }
+
+  /* Screen: black glass filling the whole Decora opening (33 x 60 mm here) */
+  .screen {
+    width: 100%; height: 100%; background: var(--glass); border-radius: calc(.8 * var(--u));
+    box-shadow: 0 0 0 1px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.06);
+    position: relative; overflow: hidden; cursor: pointer; container-type: size;
+  }
+  /* Backlight: Settings → Brightness (awake) and Dim Brightness (asleep, 5 % by default) */
+  .display { position: absolute; inset: 0; color: #fff; transition: opacity .35s; opacity: var(--bright, 1); }
+  .display.off { opacity: var(--dim, .05); }
+  .room {
+    position: absolute; top: 9%; left: 0; right: 0; text-align: center;
+    font-size: 6.4cqw; letter-spacing: .32em; text-indent: .32em; color: rgba(255,255,255,.72); white-space: nowrap;
+  }
+  .track { position: absolute; left: 70%; width: 5cqw; top: 22%; bottom: 29%; background: #2a2a2a; touch-action: none; cursor: ns-resize; }
+  .track::before { content: ""; position: absolute; left: -9cqw; right: -9cqw; top: -4cqw; bottom: -4cqw; }  /* larger touch target */
+  .fill { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; transition: height .08s linear, background .2s; }
+  .number {
+    position: absolute; right: 36%; bottom: 29%; transform: translateY(14%);
+    font-weight: 300; font-size: 27cqw; line-height: 1; font-variant-numeric: tabular-nums; transition: color .2s;
+  }
+  .mute::before { content: ""; position: absolute; inset: -40%; border-radius: 50%; }  /* larger touch target */
+  .mute {
+    position: absolute; left: 50%; top: 87%; width: 22cqw; aspect-ratio: 1; transform: translate(-50%, -50%);
+    border-radius: 50%; border: 1.1cqw solid #fff; transition: background .2s, border-color .2s;
+  }
+  .lock { display: none; position: absolute; left: 0; right: 0; top: 80%; text-align: center; }
+  .lock svg { width: 17cqw; height: 17cqw; display: block; margin: 0 auto 3cqh; }
+  /* Code entry on a locked panel: turn + push the knob, or tap the keys */
+  .code { display: none; position: absolute; inset: 0; }
+  .display.code-mode .code { display: block; }
+  .display.code-mode > :not(.code) { display: none !important; }
+  .code .title { position: absolute; top: 8%; left: 0; right: 0; text-align: center; font-size: 6cqw; letter-spacing: .3em; text-indent: .3em; color: rgba(255,255,255,.72); }
+  .code .dots { position: absolute; top: 17%; left: 0; right: 0; display: flex; justify-content: center; gap: 5cqw; }
+  .code .dots i { width: 4.6cqw; height: 4.6cqw; border-radius: 50%; border: .5cqw solid rgba(255,255,255,.7); }
+  .code .dots i.on { background: #fff; border-color: #fff; }
+  .code .msg { position: absolute; top: 24.5%; left: 0; right: 0; text-align: center; font-size: 4.2cqw; letter-spacing: .2em; text-indent: .2em; color: var(--red); min-height: 1em; }
+  .code .keys { position: absolute; left: 9%; right: 9%; top: 31%; bottom: 5%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.6cqw; }
+  .code .keys button { font: 300 9cqw var(--font); color: #fff; background: rgba(255,255,255,.07); border: 0; border-radius: 50%;
+                       aspect-ratio: 1; align-self: center; justify-self: center; width: 100%; cursor: pointer; padding: 0; }
+  .code .keys button.small { font-size: 5cqw; letter-spacing: .1em; }
+  .code .keys button.hl { outline: .6cqw solid rgba(255,255,255,.85); }
+  .code .keys button:active { background: rgba(255,255,255,.25); }
+  .lock .or { display: block; margin-top: 1.6cqh; font-size: 4.4cqw; color: rgba(255,255,255,.45); }
+  .lock span { font-size: 5.6cqw; letter-spacing: .3em; text-indent: .3em; color: rgba(255,255,255,.7); }
+  .no-speaker { display: none; position: absolute; left: 0; right: 0; top: 83%; text-align: center; font-size: 5.6cqw; letter-spacing: .26em; text-indent: .26em; color: var(--red); line-height: 1.6; }
+
+  .display.muted .number { color: #4a4a4a; }
+  .display.muted .fill { height: 0 !important; }
+  .display.muted .mute { background: var(--red); border-color: var(--red); }
+  /* Sauna (startable devices): a round session timer at the bottom. The ring is full when a
+     session starts and empties as it runs; the time left is under it. Long press on it to
+     start or stop, like the HUUM app (a white ring fills while held). */
+  .power { display: none; position: absolute; left: 50%; top: 84.5%; width: 23cqw; aspect-ratio: 1; transform: translate(-50%, -50%);
+           touch-action: none; cursor: pointer; }
+  .power::before { content: ""; position: absolute; inset: -30%; border-radius: 50%; }  /* larger touch target */
+  .power svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .power svg.timer, .power svg.ring { transform: rotate(-90deg); pointer-events: none; }
+  .power svg.timer circle { fill: none; stroke-width: 2.6; }
+  .power svg.timer .track { stroke: #2a2a2a; }
+  .power svg.timer .left { stroke: #ff6b3d; stroke-dasharray: 100; stroke-dashoffset: 100; transition: stroke-dashoffset 1s linear; }
+  .power svg.ring circle { fill: none; stroke: #fff; stroke-width: 2.6; stroke-dasharray: 100; stroke-dashoffset: 100; opacity: 0; }
+  .power.holding svg.ring circle { opacity: 1; }
+  .power svg.icon { inset: 27%; width: 46%; height: 46%; }
+  .power .steam { display: none; }
+  .display.heating .power .steam { display: block; }
+  .display.heating .power .on { display: none; }
+  .powerlabel { display: none; position: absolute; left: 0; right: 0; bottom: 2.6%; text-align: center; font-size: 4cqw;
+                letter-spacing: .24em; text-indent: .24em; color: rgba(255,255,255,.55); white-space: nowrap; }
+  .powerlabel.time { font-size: 6.4cqw; letter-spacing: .1em; text-indent: .1em; color: #fff; font-variant-numeric: tabular-nums; bottom: 1.6%; }
+  .display.startable .mute { display: none; }
+  .display.startable .power, .display.startable .powerlabel { display: block; }
+  .display.startable:not(.heating) .number { color: #6a6a6a; }
+  .display.startable:not(.heating) .fill { background: #555; }
+  /* Sauna layout: the bar stays put; the target sits at the middle of the bar with its reading
+     under it; the timer ring and the time left are one unit, centered in the space below the bar */
+  .display.startable .number { bottom: auto; top: 46.5%; transform: translateY(-50%); }
+  .display.startable .reading { left: auto; right: 36%; top: 55.5%; text-indent: 0; }
+  .display.startable .power { top: 78%; width: 20cqw; }
+  .display.startable .powerlabel { bottom: 10.5%; }
+  .display.locked .power, .display.locked .powerlabel, .display.offline .power, .display.offline .powerlabel { display: none !important; }
+  .display.locked .number { color: #4a4a4a; }
+  .display.locked .fill { background: #555; }
+  .display.locked .mute { display: none; }
+  .display.locked .lock { display: block; }
+  .display.offline .number { color: #4a4a4a; }
+  .display.offline .fill { background: #555; }
+  .display.offline .mute, .display.offline .lock { display: none; }
+  .display.offline .no-speaker { display: block; }
+
+  /* 05 SETUP screen */
+  .setup { display: none; position: absolute; inset: 0; text-align: center; cursor: pointer; }
+  .display.setup-mode .setup { display: block; }
+  .display.setup-mode > :not(.setup) { display: none !important; }
+  .setup .title { position: absolute; top: 9%; left: 0; right: 0; font-size: 6.4cqw; letter-spacing: .32em; text-indent: .32em; color: rgba(255,255,255,.72); }
+  .setup .qr { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); width: 64cqw; aspect-ratio: 1; background: #f4f4f2; padding: 4cqw; }
+  .setup .qr canvas, .setup .qr img { width: 100% !important; height: 100% !important; image-rendering: pixelated; display: block; }
+  .setup .hint { position: absolute; bottom: 8%; left: 0; right: 0; font-size: 4.6cqw; letter-spacing: .26em; text-indent: .26em; color: rgba(255,255,255,.6); }
+
+  /* 06 DEVICES: triple-click the knob */
+  .menu { display: none; position: absolute; inset: 0; }
+  /* Settings → Brightness: turn the knob (or slide the bar), push or tap to keep */
+  .adjust { display: none; position: absolute; inset: 0; cursor: pointer; }
+  .display.adjust-mode .adjust { display: block; }
+  .display.adjust-mode > :not(.adjust) { display: none !important; }
+  .adjust .title { position: absolute; top: 9%; left: 0; right: 0; text-align: center; font-size: 6cqw; letter-spacing: .28em; text-indent: .28em; color: rgba(255,255,255,.72); }
+  .adjust .value { position: absolute; top: 30%; left: 0; right: 0; text-align: center; font-weight: 300; font-size: 24cqw; font-variant-numeric: tabular-nums; }
+  .adjust .bar { position: absolute; left: 14%; right: 14%; top: 64%; height: 2.4cqw; background: #2a2a2a; }
+  .adjust .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: #fff; }
+  .adjust .hint { position: absolute; left: 0; right: 0; bottom: 6%; text-align: center; font-size: 4cqw; letter-spacing: .22em; text-indent: .22em; color: rgba(255,255,255,.5); }
+  .display.menu-mode .menu { display: block; }
+  .display.menu-mode > :not(.menu) { display: none !important; }
+  .menu .title { position: absolute; top: 9%; left: 0; right: 0; text-align: center; font-size: 6.4cqw; letter-spacing: .32em; text-indent: .32em; color: rgba(255,255,255,.72); }
+  .menu ul { list-style: none; margin: 0; padding: 0; position: absolute; top: 20%; bottom: 6%; left: 8%; right: 8%;
+             overflow-y: auto; scrollbar-width: none; overscroll-behavior: contain; }   /* swipe to scroll; the knob keeps the highlight in view */
+  .menu ul::-webkit-scrollbar { display: none; }
+  .menu li { display: flex; align-items: center; gap: 4cqw; padding: 3.6cqw 4cqw; color: rgba(255,255,255,.55); font-size: 6.2cqw; letter-spacing: .14em; text-transform: uppercase; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .menu li small { display: block; font-size: 4.2cqw; letter-spacing: .18em; color: rgba(255,255,255,.4); margin-top: .8cqw; }
+  .menu li .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .menu li .dot { width: 2.6cqw; height: 2.6cqw; border-radius: 50%; background: #2f9e44; flex: none; }
+  .menu li .dot.off { background: var(--red); }
+  .menu li.hl { color: #fff; outline: .5cqw solid rgba(255,255,255,.85); }
+  .menu li.add { color: rgba(255,255,255,.7); }
+
+  /* Stage: panel and the phone running setup */
+  .stage { display: flex; gap: 40px; align-items: center; justify-content: center; flex-wrap: wrap; max-width: 100%; }
+  /* iPhone 16 Pro at true scale (same px-per-mm as the panel): body 71.5 x 149.6 mm,
+     screen 402 x 874 pt. The setup page renders at 402 pt wide and is scaled to fit. */
+  .phone {
+    --u: min(var(--mm, 7.35px), (100vw - 32px) / 74);
+    --screen-w: calc(65.9 * var(--u));                        /* display width in mm */
+    display: none; position: relative; flex: none;
+    width: calc(71.5 * var(--u)); height: calc(149.6 * var(--u));
+    border-radius: calc(11.6 * var(--u)); background: #111;
+    box-shadow: 0 calc(3 * var(--u)) calc(8 * var(--u)) rgba(0,0,0,.3), inset 0 0 0 calc(.5 * var(--u)) #3a3a3c;
+  }
+  .phone.open { display: block; }
+  .phone .glass {
+    position: absolute; left: 50%; top: 50%; width: var(--screen-w); height: calc(143.2 * var(--u));
+    transform: translate(-50%, -50%); border-radius: calc(9.2 * var(--u)); overflow: hidden; background: #fff;
+  }
+  .phone iframe {
+    width: 402px; height: 874px; border: 0; background: #fff;
+    transform: scale(var(--s)); transform-origin: 0 0;
+  }
+  .phone .island { position: absolute; left: 50%; top: calc(4.2 * var(--u)); width: calc(18 * var(--u)); height: calc(5.2 * var(--u));
+                   transform: translateX(-50%); border-radius: 99px; background: #000; z-index: 1; pointer-events: none; }
+  .phone .close { position: absolute; top: -12px; right: -12px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: var(--text); color: var(--bg); font: 16px/28px var(--font); cursor: pointer; }
+
+  /* Chip log */
+  .chiplog { width: min(760px, 100%); }
+  .chiplog .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; gap: 10px; flex-wrap: wrap; }
+  .chiplog pre {
+    margin: 0; height: 220px; overflow: auto; background: #0e0f10; color: #b8f0b0; border-radius: 8px; padding: 10px 12px;
+    font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace; white-space: pre-wrap; -webkit-user-select: text; user-select: text;
+  }
+  .chiplog pre .W { color: #f2cc60; } .chiplog pre .E { color: #ff7b72; }
+  button.text { font: inherit; font-size: 12px; color: var(--text); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+
+  /* Panel tabs: each tab is one physical panel (one ESP32, one speaker) */
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; max-width: 100%; }
+  .tab {
+    font: inherit; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted-text);
+    background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer;
+  }
+  .tab.on { color: var(--bg); background: var(--text); border-color: var(--text); }
+  .tab.add { border-style: dashed; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: center; }
+  .actions button { white-space: nowrap; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { font: inherit; font-size: 12px; color: var(--text); background: transparent; border: 0; padding: 5px 11px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--text); color: var(--bg); }
+
+  /* Size controls and the credit-card calibration outline (85.6 x 53.98 mm) */
+  .size { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; font-size: 12px; color: var(--muted-text); }
+  .size button.text { min-width: 34px; }
+  .size output { min-width: 110px; text-align: center; font-variant-numeric: tabular-nums; }
+  .card {
+    display: none; --u: min(var(--mm, 7.35px), (100vw - 32px) / 116);
+    width: calc(85.6 * var(--u)); height: calc(53.98 * var(--u)); border: 2px dashed var(--red); border-radius: calc(3.2 * var(--u));
+    align-items: center; justify-content: center; text-align: center; padding: 12px; font-size: 13px; color: var(--muted-text); line-height: 1.5;
+  }
+  .card.show { display: flex; }
+  .card { position: relative; }
+  .card .close { position: absolute; top: -14px; right: -14px; width: 28px; height: 28px; border-radius: 50%; border: 0;
+                 background: var(--text); color: var(--bg); cursor: pointer; }
+  /* Round close buttons: an SVG cross, so it's exactly centred whatever the font */
+  button.close { display: flex; align-items: center; justify-content: center; padding: 0; }
+  button.close svg { width: 12px; height: 12px; display: block; }
+
+  /* Show / hide sections (instructions, ESP32 log) */
+  details.fold { width: min(760px, 100%); border-top: 1px solid var(--line); padding-top: 12px; }
+  details.fold > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 10px;
+                           font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted-text); }
+  details.fold > summary::-webkit-details-marker { display: none; }
+  details.fold > summary::before { content: "▸"; font-size: 12px; transition: transform .15s; }
+  details.fold[open] > summary::before { transform: rotate(90deg); }
+  details.fold > summary .sub { letter-spacing: 0; text-transform: none; font-size: 12px; }
+  details.fold[open] > summary { margin-bottom: 10px; }
+  details.fold .help { border-top: 0; padding-top: 0; }
+
+  /* Controls under the plate */
+  .controls { width: min(760px, 100%); display: grid; gap: 14px; font-size: 13px; justify-items: center; }
+  .controls .status { justify-self: stretch; max-width: 460px; width: 100%; margin: 0 auto; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  label, .status span { color: var(--muted-text); letter-spacing: .14em; text-transform: uppercase; font-size: 11px; }
+  select {
+    font: inherit; color: var(--text); background: transparent; border: 1px solid var(--line);
+    border-radius: 6px; padding: 7px 10px; flex: 1; min-width: 0;
+  }
+  .status { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; align-items: baseline; }
+  .status b { font-weight: 400; overflow-wrap: anywhere; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 7px; background: var(--muted-text); }
+  .dot.ok { background: #2f9e44; } .dot.bad { background: var(--red); }
+  .help { color: var(--muted-text); line-height: 1.7; margin: 0; border-top: 1px solid var(--line); padding-top: 14px; }
+  .help h4 { margin: 14px 0 4px; font-size: 11px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: var(--text); }
+  .help h4:first-child { margin-top: 0; }
+  .help ul { margin: 0; padding-left: 18px; }
+  .help li { margin: 2px 0; }
+  .help li::marker { color: var(--line); }
+  .help b { font-weight: 500; color: var(--text); }
+  kbd { font-family: inherit; letter-spacing: .08em; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 11px; }
+</style>
+</head>
+<body>
+  <div class="caption"><b>Model 01</b>Live prototype · drives your real speakers · <a href="/hardware/viewer.html" style="color:inherit">3D parts</a></div>
+
+  <nav class="tabs" id="tabs" aria-label="Panels"></nav>
+
+  <div class="size" aria-label="Panel size">
+    <span>Size</span>
+    <button class="text" id="smaller" aria-label="Smaller">−</button>
+    <output id="sizeLabel"></output>
+    <button class="text" id="bigger" aria-label="Bigger">+</button>
+    <button class="text" id="calibrate">Actual size…</button>
+    <button class="text" id="sizeReset">Reset</button>
+  </div>
+  <div class="card" id="card"><button class="close" id="cardClose" aria-label="Close the credit-card outline"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>Hold a credit card against your screen and press − / + until this outline matches it exactly. The panel is then shown at its real size.</div>
+
+  <div class="stage">
+  <div class="plate" id="plate" aria-label="Decora panel">
+    <div class="insert right" id="screenGang">
+      <div class="screen" id="screen" aria-label="Screen: touch to wake">
+        <div class="display off" id="display">
+          <div class="room" id="room">—</div>
+          <div class="kdots" id="kdots"></div>
+          <div class="track" id="track" role="slider" aria-label="Volume bar: slide to set"><div class="fill" id="fill" style="height:0%"></div></div>
+          <div class="number" id="number">--</div>
+          <div class="reading" id="reading"></div>
+          <div class="mute" id="muteBtn" role="button" aria-label="Mute"></div>
+          <div class="power" id="powerBtn" role="button" aria-label="Hold to start or stop">
+            <svg class="timer" viewBox="0 0 36 36"><circle class="track" cx="18" cy="18" r="16.5"/><circle class="left" id="timerLeft" cx="18" cy="18" r="16.5" pathLength="100"/></svg>
+            <svg class="ring" viewBox="0 0 36 36"><circle id="powerRing" cx="18" cy="18" r="16.5" pathLength="100"/></svg>
+            <svg class="icon on" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v8M6.6 6.4a8 8 0 1 0 10.8 0"/></svg>
+            <svg class="icon steam" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"><path d="M7 5c-1.6 2 1.6 3.6 0 5.6s1.6 3.6 0 5.6M12 4c-1.6 2 1.6 3.6 0 5.6s1.6 3.6 0 5.6s1.6 3.6 0 4.8M17 5c-1.6 2 1.6 3.6 0 5.6s1.6 3.6 0 5.6"/></svg>
+          </div>
+          <div class="powerlabel" id="powerLabel">HOLD TO START</div>
+          <div class="lock">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.3"><rect x="5" y="11" width="14" height="10"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            <span>ENTER CODE</span><span class="or">OR TAP IPHONE</span>
+          </div>
+          <div class="code" id="code">
+            <div class="title">ENTER CODE</div>
+            <div class="dots" id="codeDots"></div>
+            <div class="msg" id="codeMsg"></div>
+            <div class="keys" id="codeKeys"></div>
+          </div>
+          <div class="no-speaker">OFFLINE</div>
+          <div class="menu" id="menu">
+            <div class="title">DEVICES</div>
+            <ul id="menuList"></ul>
+          </div>
+          <div class="adjust" id="adjust">
+            <div class="title" id="adjustTitle">BRIGHTNESS</div>
+            <div class="value" id="adjustValue">100</div>
+            <div class="bar"><i id="adjustBar"></i></div>
+            <div class="hint">PUSH OR TAP TO SAVE</div>
+          </div>
+          <div class="setup" id="setupScreen" role="button" aria-label="Setup code: click to open setup">
+            <div class="title" id="setupTitle">SET UP</div>
+            <div class="knoblabel" id="setupKnob"></div>
+            <div class="qr" id="qr"></div>
+            <div class="hint">SCAN WITH IPHONE</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="phone" id="phone" aria-label="iPhone running setup">
+    <button class="close" id="phoneClose" aria-label="Close setup"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <div class="glass"><div class="island"></div><iframe id="phoneFrame" title="Panel setup on iPhone"></iframe></div>
+  </div>
+  </div>
+
+  <div class="controls">
+    <div class="actions">
+      <label>Knobs</label>
+      <span class="seg" id="knobCount"><button data-n="1">1</button><button data-n="2">2</button><button data-n="3">3</button></span>
+      <button class="text" id="nfc" hidden title="Simulates holding your iPhone to the panel's glass">Tap iPhone (NFC)</button>
+      <button class="text" id="reset">Factory reset this panel</button>
+      <button class="text" id="remove">Remove this panel</button>
+      <button class="text" id="startOver">Start over as a new user</button>
+    </div>
+    <div class="status">
+      <span>Device</span><b id="sConn"><span class="dot"></span>…</b>
+      <span>Knob</span><b id="sDriver">—</b>
+      <span>Last command</span><b id="sLatency">—</b>
+    </div>
+  </div>
+
+  <details class="fold" id="foldHelp">
+    <summary>How to use the panel</summary>
+    <div class="help">
+      <h4>Knob and screen</h4>
+      <ul>
+        <li><b>Turn:</b> click and drag a knob in a circle, scroll on it, or press <kbd>↑</kbd> <kbd>↓</kbd>. Each step is 2%.</li>
+        <li><b>Wake:</b> click the knob or touch the screen. It dims to 5% after a few seconds.</li>
+        <li><b>Set a level:</b> tap or slide on the bar on the screen.</li>
+        <li><b>Mute:</b> double-click the knob, or click the circle on the screen (<kbd>M</kbd>).</li>
+        <li><b>Several knobs:</b> the screen follows the knob you touch and says KNOB 1, 2 or 3 (<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>).</li>
+      </ul>
+      <h4>Menu</h4>
+      <ul>
+        <li><b>Three clicks</b>, from anywhere: the MENU, with <b>Devices</b> and <b>Settings</b>.</li>
+        <li><b>In a menu:</b> turn to move, one click picks, <b>two clicks go back</b> (like an iPod's MENU button). Lists end with ‹ Back or Exit.</li>
+        <li><b>Devices:</b> switch this knob's device, Master Volume (with 2+ speakers), or <b>+ Add device</b>.</li>
+        <li><b>Settings:</b> Brightness, Dim Brightness, Temperature °F / °C, Name, Auto Update, Lock panel.</li>
+        <li><b>Shortcuts:</b> tap the device's name for every device of that kind; double-tap a temperature for °F / °C.</li>
+      </ul>
+      <h4>Sauna</h4>
+      <ul>
+        <li><b>Turn</b> to set the target. While it's off, only the target changes.</li>
+        <li><b>Hold</b> the round timer or the knob to start or stop it: after 1 s a white ring fills.</li>
+        <li>While it runs, the ring empties over the session and shows the time left.</li>
+      </ul>
+      <h4>Lock</h4>
+      <ul>
+        <li><b>Hold the knob</b> (or <kbd>L</kbd>): after 3 s a red ring fills, then the panel locks. Not on a sauna: use Settings → Lock panel.</li>
+        <li><b>First lock:</b> choose a 4-digit code on the panel (SET CODE, then CONFIRM CODE).</li>
+        <li><b>Unlock:</b> touch or turn, then enter the code (turn and push, tap, or type it), or use <b>Tap iPhone (NFC)</b>.</li>
+      </ul>
+      <h4>Setup</h4>
+      <ul>
+        <li>A new panel shows a code. <b>Click it</b> to set it up the way a buyer would, or scan it with your iPhone when the server runs with <kbd>--lan</kbd>.</li>
+        <li>On a setup code, click a knob to set up that knob.</li>
+        <li><b>+ Add panel</b> simulates another panel in another room. Devices sync to every panel; each knob keeps its own device.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="fold chiplog" id="foldLog">
+    <summary>ESP32 log <span class="sub">what the panel's chip would be doing · (sim) = simulated in the prototype</span></summary>
+    <pre id="log" aria-live="polite"></pre>
+  </details>
+
+<script src="/api.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+// The panel's behaviour. This is the spec the ESP32 firmware follows
+// (docs/UX.md describes it in words). A panel has 1-3 knobs and one screen;
+// each knob controls its own device, and the screen follows the knob in focus.
+const STEP = 2;              // % per detent
+const DETENT_DEG = 12;       // knob rotation per detent
+const IDLE_MS = 6000;
+const HOLD_DELAY_MS = 3000;  // hold this long before the lock ring appears
+const HOLD_FILL_MS = 3000;   // then the ring fills; the lock toggles when it's full
+const CLICK_GAP_MS = 350;    // clicks closer than this count together
+const POLL_MS = 1500;
+const GANG_MM = 46.04;       // Decora gang spacing
+const PLATE_MM = { 2: 114.3, 3: 160.3, 4: 206.4 };
+
+const $ = id => document.getElementById(id);
+let PANEL = null;            // id of the panel being shown
+try { PANEL = localStorage.getItem('wallvol.panel'); } catch {}
+const api = path => `/api/panels/${encodeURIComponent(PANEL)}${path}`;
+const post = (path, body) => fetch(path, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body || {}) });
+
+const newKnob = () => ({ speaker: null, level: null, muted: false, savedLevel: null, connected: false, error: null, reading: null, target: 60,
+                         angle: 0, pending: null, inFlight: false, lastLocal: 0 });
+// Locked-panel code entry: the keypad, and where the knob's highlight is
+const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'DEL', '0', 'EXIT'];
+const CODE_IDLE_MS = 10000;
+const state = {
+  code: null,          // {digits, hl, msg, mode: 'enter' | 'set' | 'confirm', first} on the code screen
+  hasCode: false,      // the panel has an unlock code (set on the panel at the first lock)
+  knobs: [newKnob()], focus: 0,
+  configured: true, setupUrl: null, devices: [],
+  menu: null, menuKnob: 0, menuKind: 'devices',   // menuKind: devices | units | same (devices like the one shown)
+  units: 'F',
+  autoUpdate: true,                      // Settings → Auto Update (new firmware from the releases)
+  screen: { brightness: 100, dim: 5 },   // backlight %, from the panel's settings
+  adjust: null,                          // { key: 'brightness' | 'dim', value } while setting one          // device menu: highlighted index, and which knob it's for
+  adding: false, addKnob: 0,        // showing the ADD DEVICE code for a knob
+  locked: false, awake: false,
+};
+const K = (k = state.focus) => state.knobs[k] || state.knobs[0] || newKnob();   // never undefined, even mid-switch
+
+// ---- How a device's 0-100 level is shown ----
+// Temperatures come from the drivers in °F; the home can show them in °C (units screen)
+const temp = (sp, f) => state.units === 'C' && (!sp || sp.unit === '°F') ? (f - 32) * 5 / 9 : f;
+function shown(sp, level) {
+  if (level === null) return { text: '--', unit: '' };
+  if (sp && sp.control === 'switch') return { text: level > 0 ? 'ON' : 'OFF', unit: '' };
+  if (sp && sp.control === 'temperature') return { text: String(Math.round(temp(sp, sp.min + level / 100 * (sp.max - sp.min)))), unit: '°' };
+  return { text: String(Math.round(level)), unit: '' };
+}
+
+// ---- Sending: per knob, only the newest level, one request at a time ----
+function send(level, k = state.focus) { K(k).pending = level; if (!K(k).inFlight) flush(k); }
+async function flush(k) {
+  const kn = K(k);
+  if (kn.pending === null || !kn.speaker) return;
+  const level = kn.pending; kn.pending = null; kn.inFlight = true;
+  try {
+    const j = await (await post(api('/volume'), { level, knob: k })).json();
+    $('sLatency').textContent = j.ok ? `Knob ${k + 1}: set ${shown(kn.speaker, level).text} in ${j.ms} ms` : `Failed: ${j.error}`;
+    if (!j.ok) { kn.connected = false; kn.error = j.error; render(); }
+  } catch (e) {
+    $('sLatency').textContent = `Failed: ${e}`;
+  } finally {
+    kn.inFlight = false;
+    kn.lastLocal = Date.now();
+    if (kn.pending !== null) flush(k);
+  }
+}
+
+// ---- Screen ----
+let idleTimer = null;
+function wake() {
+  state.awake = true; render();
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => { state.awake = false; render(); }, IDLE_MS);
+}
+function focusKnob(k) {
+  if (k === state.focus || !state.knobs[k]) return;
+  state.focus = k;
+  clicks = 0;
+  render();
+}
+function render() {
+  const d = $('display'), kn = K();
+  const sp = kn.speaker;
+  d.classList.toggle('off', state.configured && !state.adding && !state.awake);   // setup codes stay lit
+  d.classList.toggle('setup-mode', !state.configured || state.adding);
+  d.classList.toggle('menu-mode', state.configured && !state.adding && state.menu !== null);
+  d.classList.toggle('adjust-mode', state.configured && !state.adding && !!state.adjust);
+  // the level being set is previewed live, even Dim Brightness
+  const a = state.adjust;
+  d.style.setProperty('--bright', Math.max(10, a ? a.value : state.screen.brightness) / 100);   // 10 % floor so the numbers stay readable
+  d.style.setProperty('--dim', state.screen.dim / 100);
+  if (a) {
+    $('adjustTitle').textContent = a.key === 'dim' ? 'DIM BRIGHTNESS' : 'BRIGHTNESS';
+    $('adjustValue').textContent = `${a.value}%`;
+    $('adjustBar').style.width = `${a.value}%`;
+  }
+  $('setupTitle').textContent = state.adding ? 'ADD DEVICE' : 'SET UP';
+  $('setupKnob').textContent = state.knobs.length > 1 ? `KNOB ${setupKnob() + 1}` : '';
+  if (state.menu !== null) renderMenu();
+  d.classList.toggle('offline', state.configured && !!sp && !kn.connected);
+  d.classList.toggle('muted', kn.connected && kn.muted);
+  d.classList.toggle('locked', state.locked);
+  d.classList.toggle('code-mode', state.configured && !!state.code && (state.locked || state.code.mode !== 'enter'));
+  if (state.code) renderCode();
+  d.classList.toggle('switch', !!sp && sp.control === 'switch');
+  const power = !!sp && !!sp.startable;
+  const heating = power && kn.level > 0;
+  d.classList.toggle('startable', power);
+  d.classList.toggle('heating', heating);
+  renderTimer();
+  $('room').textContent = sp ? sp.room : (state.configured ? `KNOB ${state.focus + 1}` : 'SET UP');
+  // A sauna that's off shows the target it will start at (dimmed)
+  const v = shown(sp, power && !heating ? kn.target : kn.muted ? kn.savedLevel : kn.level);
+  $('number').innerHTML = '';
+  $('number').append(v.text);
+  if (v.unit) { const u = document.createElement('span'); u.className = 'unit'; u.textContent = v.unit; $('number').append(u); }
+  // Live reading under the target, e.g. the sauna's current temperature: "NOW 165°"
+  const r = kn.reading || {};
+  $('reading').textContent = [power && !heating ? 'OFF' : '', r.now != null ? `NOW ${Math.round(temp(sp, r.now))}°` : '', r.probe != null ? `PROBE ${Math.round(temp(sp, r.probe))}°` : '', r.text || '']
+    .filter(Boolean).join(' · ');
+  const lvl = power && !heating ? kn.target : kn.muted ? kn.savedLevel : kn.level;
+  $('fill').style.height = `${lvl === null ? 0 : lvl}%`;
+  $('kdots').textContent = state.knobs.length > 1 && sp ? `KNOB ${state.focus + 1}` : '';
+  document.querySelectorAll('.knob').forEach((el, i) => {
+    el.classList.toggle('focus', i === state.focus);
+    // The knurl repeats every 4°, so a 12° step alone looks like no motion: the spun face
+    // (uneven highlights) turns with it, so every step is visible
+    const turnTo = `rotate(${K(i).angle}deg)`;
+    el.querySelector('.knurl').style.transform = turnTo;
+    el.querySelector('.face').style.transform = turnTo;
+    const l = K(i).level;
+    el.setAttribute('aria-valuenow', l === null ? 0 : Math.round(l));
+  });
+  // The error text comes from the device (e.g. a Sonos HTTP 500 body): always text, never HTML
+  const conn = !state.configured ? ['bad', 'Not set up'] : !sp ? ['', 'No device on this knob yet']
+    : [kn.connected ? 'ok' : 'bad', kn.connected ? 'Connected' : (kn.error || 'Connecting…')];
+  $('sConn').innerHTML = `<span class="dot ${conn[0]}"></span>`;
+  $('sConn').append(conn[1]);
+  $('sDriver').textContent = sp ? `Knob ${state.focus + 1} → ${sp.room} · ${sp.brand} (${sp.name})` : `Knob ${state.focus + 1}`;
+}
+
+// ---- Sauna session timer: a ring that empties as the session runs, time left under it ----
+const SESSION_S = 3 * 3600;          // HUUM's default session, if the start isn't known
+function renderTimer() {
+  const kn = K(), sp = kn.speaker;
+  if (!sp || !sp.startable) return;
+  const heating = kn.level > 0, r = kn.reading || {}, label = $('powerLabel');
+  const now = Date.now() / 1000;
+  const left = heating && r.ends ? Math.max(0, r.ends - now) : null;
+  const total = r.starts && r.ends ? Math.max(1, r.ends - r.starts) : SESSION_S;
+  $('timerLeft').style.strokeDashoffset = left === null ? (heating ? 0 : 100) : 100 - Math.min(1, left / total) * 100;
+  $('timerLeft').style.opacity = heating ? 1 : 0;   // no stray end cap when empty
+  label.classList.toggle('time', left !== null);
+  if (left === null) label.textContent = heating ? 'HOLD TO STOP' : 'HOLD TO START';
+  else {
+    const t = Math.round(left), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = t % 60;
+    label.textContent = `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  }
+}
+setInterval(renderTimer, 1000);
+
+// ---- Turning, mute, lock ----
+// The knob turns physically whatever the screen is showing (setup code, menu, code pad,
+// locked), so its angle always follows the hand, before any of the cases below
+function spinKnob(detents) {
+  const kn = K(), el = document.querySelectorAll('.knob')[state.focus];
+  if (!kn) return;
+  kn.angle += detents * DETENT_DEG;
+  if (el) for (const part of el.querySelectorAll('.knurl, .face')) part.style.transform = `rotate(${kn.angle}deg)`;
+}
+function turn(detents) {
+  spinKnob(detents);
+  if (state.configured && (state.locked || (state.code && state.code.mode !== 'enter'))) {
+    if (!state.code) { openCode(); return; }
+    state.code.hl = (state.code.hl + Math.sign(detents) + KEYS.length) % KEYS.length;
+    touchCode();
+    return;
+  }
+  if (state.menu !== null) { moveMenu(detents); return; }
+  if (state.adjust) { moveAdjust(detents); return; }
+  if (state.adding || !state.configured) return;
+  const kn = K();
+  if (!kn.speaker) { openMenu(); return; }          // a knob with no device asks for one
+  wake();
+  if (state.locked || !kn.connected) { render(); return; }
+  if (kn.speaker.startable) {                       // sauna: the knob sets the target...
+    kn.target = Math.max(1, Math.min(100, kn.target + detents * STEP));
+    if (kn.level > 0) { kn.level = kn.target; send(kn.target); }   // ...live only while it's on
+    render();
+    return;
+  }
+  let next;
+  if (kn.speaker.control === 'switch') {
+    next = detents > 0 ? 100 : 0;                   // right = on, left = off
+  } else {
+    let base = kn.muted ? kn.savedLevel : kn.level;
+    if (base === null) base = 20;                   // unknown level (e.g. Syng): start quiet
+    next = Math.max(0, Math.min(100, base + detents * STEP));
+  }
+  kn.muted = false; kn.savedLevel = null;
+  if (next !== kn.level) { kn.level = next; send(next); }
+  render();
+}
+function toggleMute(fromKnob = false) {
+  const kn = K();
+  if (!kn.speaker) return;
+  const wasAwake = state.awake;
+  wake();
+  // A tap on dark glass only wakes it; a double push of the knob works even when dark
+  if (state.locked || !kn.connected || (!wasAwake && !fromKnob)) return;
+  if (kn.speaker.startable) { render(); return; }   // start / stop only with the long press on the screen
+  if (kn.speaker.control === 'switch') {            // on/off devices: mute = toggle
+    kn.level = kn.level > 0 ? 0 : 100; send(kn.level);
+  } else if (kn.muted) {
+    kn.muted = false; kn.level = kn.savedLevel ?? 20; kn.savedLevel = null; send(kn.level);
+  } else {
+    kn.muted = true; kn.savedLevel = kn.level ?? 20; kn.level = 0; send(0);
+  }
+  render();
+}
+function toggleLock() {
+  // Hold = lock. A locked panel unlocks with its code or an iPhone, not a hold.
+  if (state.locked) { openCode(); return; }
+  if (!state.hasCode) {                  // first lock: choose the code on the panel itself
+    state.code = { digits: '', hl: 0, msg: '', mode: 'set', first: null };
+    event('first lock: SET CODE');
+    touchCode();
+    return;
+  }
+  lockNow();
+}
+function lockNow() {
+  state.locked = true; state.code = null; state.lockAt = Date.now(); state.returnTo = null; wake();
+  post(api('/lock'), { locked: true }).catch(() => {});   // the lock lives on the panel's chip
+}
+
+// ---- Unlock code (4 digits) on a locked panel ----
+let codeTimer = null;
+function openCode() {
+  state.code = state.code || { digits: '', hl: 0, msg: '', mode: 'enter' };
+  touchCode();
+}
+function touchCode() {
+  wake();
+  clearTimeout(codeTimer);
+  codeTimer = setTimeout(() => { state.code = null; render(); }, CODE_IDLE_MS);
+  render();
+}
+function closeCode() { clearTimeout(codeTimer); state.code = null; if (!state.locked && backToSettings()) return; render(); }
+function renderCode() {
+  const c = state.code;
+  $('codeDots').innerHTML = [0, 1, 2, 3].map(i => `<i class="${i < c.digits.length ? 'on' : ''}"></i>`).join('');
+  $('codeMsg').textContent = c.msg;
+  document.querySelector('.code .title').textContent =
+    c.mode === 'set' ? 'SET CODE' : c.mode === 'confirm' ? 'CONFIRM CODE' : 'ENTER CODE';
+  const keys = $('codeKeys');
+  if (!keys.children.length) {
+    KEYS.forEach((k, i) => {
+      const b = document.createElement('button');
+      b.textContent = k; b.className = k.length > 1 ? 'small' : '';
+      b.addEventListener('click', e => { e.stopPropagation(); if (state.code) { state.code.hl = i; pressKey(k); } });
+      keys.appendChild(b);
+    });
+  }
+  [...keys.children].forEach((b, i) => b.classList.toggle('hl', i === c.hl));
+}
+async function pressKey(k) {
+  const c = state.code;
+  if (!c) return;
+  c.msg = '';
+  if (k === 'EXIT') { closeCode(); return; }
+  if (k === 'DEL') c.digits = c.digits.slice(0, -1);
+  else if (c.digits.length < 4) c.digits += k;
+  touchCode();
+  if (c.digits.length < 4) return;
+  if (c.mode === 'set') {                       // first entry: ask again to confirm
+    Object.assign(c, { mode: 'confirm', first: c.digits, digits: '' });
+    touchCode();
+    return;
+  }
+  if (c.mode === 'confirm') {
+    if (c.digits !== c.first) {
+      Object.assign(c, { mode: 'set', first: null, digits: '', msg: "DIDN'T MATCH" });
+      touchCode();
+      return;
+    }
+    const r = await post(api('/set-code'), { code: c.digits });
+    if ((await r.json().catch(() => ({}))).ok) { state.hasCode = true; event('unlock code set'); lockNow(); }
+    else { c.digits = ''; c.msg = 'TRY AGAIN'; touchCode(); }
+    return;
+  }
+  const r = await post(api('/unlock-code'), { code: c.digits });
+  const j = await r.json().catch(() => ({}));
+  if (j.ok) {
+    closeCode();
+    state.locked = false; wake();
+    event('unlock code accepted');
+    return;
+  }
+  c.digits = '';
+  c.msg = j.error === 'no code set' ? 'NO CODE · TAP IPHONE' : j.wait ? `WAIT ${j.wait} S` : 'WRONG CODE';
+  touchCode();
+}
+function event(text) { post(api('/event'), { event: text }).catch(() => {}); }
+
+// Knob push. In the device menu a click picks the highlighted item right away.
+// Otherwise clicks are counted and acted on once CLICK_GAP_MS passes with no
+// further click: 1 = wake, 2 = mute / unmute (on/off for switches), 3 = device menu.
+let clicks = 0, clickTimer = null;
+function pushKnob() {
+  if (state.configured && (state.locked || (state.code && state.code.mode !== 'enter'))) {   // push enters the highlighted key
+    if (!state.code) openCode(); else pressKey(KEYS[state.code.hl]);
+    return;
+  }
+  // In a menu or a setting, one click picks / saves; three clicks go to the top MENU from
+  // anywhere, so a single click waits the click gap to be sure it's alone
+  if (state.menu !== null || state.adjust) {
+    clicks++;
+    clearTimeout(clickTimer);
+    keepMenuOpen();
+    clickTimer = setTimeout(() => {
+      const n = clicks; clicks = 0;
+      if (n >= 3) goTop();
+      else if (n === 2) goBack();
+      else if (state.menu !== null) pickMenu();
+      else if (state.adjust) saveAdjust();
+    }, CLICK_GAP_MS);
+    return;
+  }
+  // On the setup code, a knob push picks which knob is being set up
+  if (!state.configured) { showQr(); syncPhone(); event(`setup screen: knob ${state.focus + 1}`); render(); return; }
+  if (state.adding) {
+    if (state.focus === state.addKnob) { state.adding = false; event('knob push: cancelled adding a device'); wake(); return; }
+    state.addKnob = state.focus;
+    showQr(); syncPhone(); event(`add device: now for knob ${state.addKnob + 1}`); render();
+    return;
+  }
+  if (state.configured && !K().speaker) { openMenu(); return; }
+  if (!state.awake) wake();
+  clicks++;
+  clearTimeout(clickTimer);
+  clickTimer = setTimeout(() => {
+    const n = clicks; clicks = 0;
+    if (n === 2) { toggleMute(true); event(`knob ${state.focus + 1} double-push: ${K().muted || K().level === 0 ? 'muted/off' : 'unmuted/on'}`); }
+    else if (n >= 3) openMenu('main');
+    else wake();
+  }, CLICK_GAP_MS);
+}
+
+// ---- 06 DEVICES: a knob's device menu ----
+// The same menu shows three lists: a knob's devices (triple-click), °F / °C (double-tap the
+// temperature) and the devices like the one shown, e.g. every sauna (tap its name)
+const category = d => !d ? '' : d.startable ? 'sauna' : d.control === 'temperature' ? 'grill' : d.control === 'switch' ? 'light' : 'speaker';
+const MAIN = [
+  { go: 'devices', room: 'Devices', brand: 'Switch or add a device' },
+  { go: 'settings', room: 'Settings', brand: 'Brightness, units, lock' },
+];
+const SETTINGS = [
+  { go: 'brightness', room: 'Brightness', brand: '' },
+  { go: 'dim', room: 'Dim Brightness', brand: 'When the screen sleeps' },
+  { go: 'units', room: 'Temperature', brand: '°F or °C' },
+  { go: 'rename', room: 'Name', brand: '' },
+  { go: 'autoupdate', room: 'Auto Update', brand: '' },
+  { go: 'lock', room: 'Lock panel', brand: 'Or hold the knob' },
+];
+const UNITS = [{ units: 'F', room: '°F', brand: 'Fahrenheit' }, { units: 'C', room: '°C', brand: 'Celsius' }];
+// Every list ends with a way out: Exit (back to the main screen) or ‹ Back (one level up)
+function menuItems() {
+  const back = to => ({ back: to, label: to ? '‹ Back' : 'Exit' });
+  if (state.menuKind === 'main') return [...MAIN, back(null)];
+  if (state.menuKind === 'settings') return [...SETTINGS, back('main')];
+  if (state.menuKind === 'units') return [...UNITS, back(state.returnTo !== null && state.returnTo !== undefined ? 'settings' : null)];
+  if (state.menuKind === 'same') {
+    const cat = category(K(state.menuKnob).speaker);
+    // "+ Add sauna" is off for now (Parker has one sauna; adding a second needs HUUM's new
+    // Sauna ID + CODE API, not found yet). To bring it back:
+    // return [...state.devices.filter(d => category(d) === cat), { add: true, cat, label: `+ Add ${cat}` }, back(null)];
+    return [...state.devices.filter(d => category(d) === cat), back(null)];
+  }
+  return [...state.devices, { add: true }, back('main')];
+}
+let menuTimer = null;
+function openMenu(kind = 'devices') {
+  if (!state.configured || state.locked) { wake(); return; }
+  state.menuKnob = state.focus;
+  state.menuKind = kind;
+  if (kind !== 'units' && kind !== 'settings') state.returnTo = null;
+  const cur = kind === 'main' || kind === 'settings' ? 0 : kind === 'units' ? UNITS.findIndex(u => u.units === state.units)
+    : menuItems().findIndex(d => K().speaker && d.id === K().speaker.id);
+  state.menu = Math.max(0, cur);
+  event(`knob ${state.focus + 1}: ${kind === 'main' ? 'menu' : kind === 'settings' ? 'settings' : kind === 'units' ? 'units screen' : kind === 'same' ? `${category(K().speaker)} list` : 'device menu'}`);
+  keepMenuOpen();
+  render();
+}
+function keepMenuOpen() { wake(); clearTimeout(menuTimer); menuTimer = setTimeout(closeMenu, IDLE_MS); }
+// Every way out of a page opened from SETTINGS (save, pick, idle, EXIT) lands back on SETTINGS;
+// SETTINGS itself closes to the main screen
+// Three clicks: the top MENU, wherever you are (a setting being changed is dropped, not saved)
+// Two clicks: back one level, like "‹ Back" (a setting being changed is saved first)
+function goBack() {
+  if (state.adjust) { saveAdjust(); return; }          // saving returns to SETTINGS
+  const items = menuItems(), last = items[items.length - 1];
+  state.menu = items.length - 1;                       // the list's ‹ Back / Exit
+  if (last && 'back' in last) pickMenu();
+}
+function goTop() {
+  state.adjust = null; state.returnTo = null;
+  clearTimeout(menuTimer); state.menu = null;
+  event('triple push: menu');
+  openMenu('main');
+}
+function closeMenu() {
+  clearTimeout(menuTimer); state.menu = null;
+  if (state.adjust) { saveAdjust(); return; }
+  if (backToSettings()) return;
+  render();
+}
+
+// ---- Settings → Brightness / Dim Brightness ----
+const ADJ = { brightness: [10, 100], dim: [0, 100] };   // allowed range, %
+function openAdjust(key) {
+  state.adjust = { key, value: state.screen[key] };
+  event(`settings: ${key === 'dim' ? 'dim brightness' : 'brightness'}`);
+  keepMenuOpen(); render();
+}
+function moveAdjust(detents) {
+  const a = state.adjust, [lo, hi] = ADJ[a.key];
+  a.value = Math.max(lo, Math.min(hi, a.value + Math.sign(detents) * 5));
+  keepMenuOpen(); render();
+}
+async function saveAdjust() {
+  const a = state.adjust;
+  if (!a) return;
+  clearTimeout(menuTimer);
+  state.adjust = null;
+  state.screen[a.key] = a.value;
+  render();
+  await post(api('/screen'), { [a.key]: a.value });
+  event(`${a.key === 'dim' ? 'dim brightness' : 'brightness'} ${a.value}%`);
+  wake();
+  backToSettings();
+}
+function backToSettings() {
+  if (state.returnTo === null || state.returnTo === undefined) return false;
+  const i = state.returnTo;
+  state.returnTo = null;
+  openMenu('settings');
+  state.menu = i;
+  render();
+  return true;
+}
+function moveMenu(detents) {
+  state.menu = Math.max(0, Math.min(menuItems().length - 1, state.menu + Math.sign(detents)));
+  keepMenuOpen(); render();
+}
+function renderMenu() {
+  const items = menuItems(), ul = $('menuList'), cur = K(state.menuKnob).speaker;
+  document.querySelector('.menu .title').textContent = state.menuKind === 'main' ? 'MENU'
+    : state.menuKind === 'settings' ? 'SETTINGS'
+    : state.menuKind === 'units' ? 'UNITS'
+    : state.menuKind === 'same' ? `${category(cur).toUpperCase()}S`
+    : state.knobs.length > 1 ? `KNOB ${state.menuKnob + 1}` : 'DEVICES';
+  // Only rebuild when something changed: replacing the items under a finger (the 1.5 s poll
+  // re-renders) would swallow the tap
+  const key = JSON.stringify([state.menuKind, state.menu, state.units, state.screen, state.autoUpdate, cur && cur.id, cur && cur.room,
+    items.map(it => [it.id, it.room, it.connected, it.go, it.units, it.add, it.back])]);
+  if (ul.dataset.key === key) return;
+  ul.dataset.key = key;
+  ul.innerHTML = '';
+  items.forEach((it, i) => {
+    const li = document.createElement('li');
+    li.className = (i === state.menu ? 'hl ' : '') + (it.add ? 'add' : '');
+    if (it.add || 'back' in it) { li.innerHTML = '<span class="label"></span>'; li.firstChild.textContent = it.label || '+ Add device'; }
+    else {
+      li.innerHTML = it.units || it.go ? '<span class="label"></span>' : `<span class="dot ${it.connected ? '' : 'off'}"></span><span class="label"></span>`;
+      const label = li.querySelector('.label');
+      const isCur = it.go ? false : it.units ? it.units === state.units : cur && it.id === cur.id;
+      label.textContent = it.room + (isCur ? ' ●' : '');   // ● = the current one
+      const small = document.createElement('small');
+      small.textContent = it.go === 'units' ? `Now °${state.units}` : it.go === 'brightness' ? `${state.screen.brightness}%`
+        : it.go === 'dim' ? `${state.screen.dim}% when asleep`
+        : it.go === 'autoupdate' ? (state.autoUpdate ? 'On · installs new firmware' : 'Off')
+        : it.go === 'rename' ? (cur ? `${cur.room} · edit on iPhone` : 'No device on this knob')
+        : it.go === 'lock' && cur && cur.startable ? 'Holding the knob starts the sauna' : it.brand;
+      label.appendChild(small);
+    }
+    li.addEventListener('click', e => { e.stopPropagation(); state.menu = i; pickMenu(); });
+    ul.appendChild(li);
+  });
+  // keep the knob's highlight in view (without scrolling the page)
+  const hl = ul.querySelector('.hl');
+  if (hl) {
+    if (hl.offsetTop < ul.scrollTop) ul.scrollTop = hl.offsetTop;
+    else if (hl.offsetTop + hl.offsetHeight > ul.scrollTop + ul.clientHeight) ul.scrollTop = hl.offsetTop + hl.offsetHeight - ul.clientHeight;
+  }
+}
+async function pickMenu() {
+  const it = menuItems()[state.menu], k = state.menuKnob;
+  // A setting picked from SETTINGS comes back to SETTINGS when it's done
+  const fromSettings = state.menuKind === 'settings' ? state.menu : null;
+  if (it && 'back' in it) {                 // ‹ Back / Exit
+    const to = it.back, ret = state.returnTo;
+    state.returnTo = null;
+    clearTimeout(menuTimer); state.menu = null;
+    if (to) { openMenu(to); if (to === 'settings' && ret != null) { state.menu = ret; render(); } }
+    else { wake(); render(); }
+    return;
+  }
+  if (state.menuKind !== 'units') state.returnTo = null;   // °F / °C keeps its way back to SETTINGS
+  clearTimeout(menuTimer); state.menu = null;
+  if (fromSettings !== null && it.go !== 'devices') state.returnTo = fromSettings;
+  if (it.go === 'lock') { toggleLock(); render(); return; }
+  if (it.go === 'rename') {                 // typing happens on the iPhone; the panel stays on SETTINGS
+    const sp = K(k).speaker;
+    backToSettings();
+    if (sp && sp.id !== 'master') openPhone(`/setup?panel=${encodeURIComponent(PANEL)}&mode=rename&device=${encodeURIComponent(sp.id)}`);
+    return;
+  }
+  if (it.go === 'autoupdate') {
+    state.autoUpdate = !state.autoUpdate; state.autoUpdateAt = Date.now();
+    event(`auto update ${state.autoUpdate ? 'on' : 'off'}`);
+    backToSettings();
+    await post(api('/auto-update'), { on: state.autoUpdate });
+    return;
+  }
+  if (it.go === 'brightness' || it.go === 'dim') { openAdjust(it.go); return; }
+  if (it.go) { openMenu(it.go); return; }
+  if (it.units) {
+    state.units = it.units;
+    event(`units: °${it.units}`);
+    await post('/api/units', { units: it.units });
+    wake(); backToSettings() || render();
+    return;
+  }
+  if (it.add) {
+    // "+ Add sauna" from the sauna list goes straight to the HUUM sign-in ("+ Add grill": Traeger)
+    const kind = { sauna: 'huum', grill: 'traeger' }[it.cat];
+    state.adding = true; state.addKnob = k; state.addKind = kind || null;
+    qrFor = null; showQr();
+    event(`knob ${k + 1}: add ${it.cat || 'device'}, showing setup code`);
+    render();
+    if (kind) { $('phone').classList.remove('open'); openSetup(); }   // the phone opens on the sign-in
+    return;
+  }
+  if (K(k).speaker && it.id === K(k).speaker.id) { wake(); return; }
+  await post(api('/select'), { speaker: it.id, knob: k });
+  await poll(true);
+  wake();
+}
+
+// ---- Volume bar: touch or slide on the screen (acts on the knob in focus) ----
+function setLevel(level) {
+  const kn = K();
+  if (!kn.speaker || state.locked || !kn.connected) { wake(); return; }
+  const next = Math.max(0, Math.min(100, Math.round(level / STEP) * STEP));
+  wake();
+  kn.muted = false; kn.savedLevel = null;
+  if (next !== kn.level) { kn.level = next; send(next); }
+  render();
+}
+const track = $('track');
+let slide = null;
+const levelAt = e => { const r = track.getBoundingClientRect(); return (r.bottom - e.clientY) / r.height * 100; };
+track.addEventListener('pointerdown', e => {
+  if (!state.configured) return;
+  e.stopPropagation();
+  if (!state.awake) { wake(); return; }      // a touch on dark glass only wakes it
+  track.setPointerCapture(e.pointerId);
+  slide = { start: K().level };
+  setLevel(levelAt(e));
+});
+track.addEventListener('pointermove', e => { if (slide) setLevel(levelAt(e)); });
+const endSlide = () => {
+  if (slide && K().level !== slide.start) event(`screen: knob ${state.focus + 1} level set to ${K().level}`);
+  slide = null;
+};
+track.addEventListener('pointerup', endSlide);
+track.addEventListener('pointercancel', endSlide);
+track.addEventListener('click', e => e.stopPropagation());   // not a screen tap
+
+// ---- Sauna start / stop: long press on the screen's button (like the HUUM app) ----
+const POWER_WAIT_MS = 1000;   // nothing shows for the first second, so quick clicks stay clicks
+const POWER_HOLD_MS = 1500;
+let powerHold = null;
+$('powerBtn').addEventListener('pointerdown', e => {
+  e.stopPropagation();
+  if (!state.awake) { wake(); return; }               // a touch on dark glass only wakes it
+  if (startPowerHold()) $('powerBtn').setPointerCapture(e.pointerId);
+});
+// Holding the knob on a sauna does the same (instead of the red lock ring)
+const powerHoldable = () => { const kn = K(); return state.configured && !state.locked && !state.code && state.menu === null
+  && !state.adjust && !state.adding && !!kn.speaker && !!kn.speaker.startable && kn.connected; };
+function startPowerHold(onDone) {
+  const kn = K();
+  if (!powerHoldable()) return false;
+  const start = performance.now();
+  const ring = $('powerRing');
+  const step = t => {
+    if (!powerHold) return;
+    const p = Math.min(1, (t - start - POWER_WAIT_MS) / POWER_HOLD_MS);
+    $('powerBtn').classList.toggle('holding', p > 0);
+    ring.style.strokeDashoffset = 100 - Math.max(0, p) * 100;
+    if (p < 1) { powerHold.anim = requestAnimationFrame(step); return; }
+    endPowerHold();
+    if (onDone) onDone();
+    const on = kn.level > 0;
+    kn.level = on ? 0 : kn.target;
+    send(kn.level);
+    event(`${kn.speaker.room}: ${on ? 'stopped' : 'started'} (long press)`);
+    wake();
+  };
+  powerHold = { anim: requestAnimationFrame(step) };
+  wake();
+  return true;
+}
+function endPowerHold() {
+  if (powerHold) cancelAnimationFrame(powerHold.anim);
+  powerHold = null;
+  $('powerBtn').classList.remove('holding');
+  $('powerRing').style.strokeDashoffset = 100;
+}
+$('powerBtn').addEventListener('pointerup', endPowerHold);
+$('powerBtn').addEventListener('pointercancel', endPowerHold);
+$('powerBtn').addEventListener('click', e => e.stopPropagation());
+
+// ---- Easter egg: unscrew the plate. Each click turns a screw counterclockwise; the third
+// spins it out and opens the 3D parts viewer (what's behind the plate) ----
+const SCREW_STEP_DEG = 60;
+$('plate').addEventListener('click', e => {
+  const sc = e.target.closest('.screw');
+  if (!sc || sc.classList.contains('out')) return;
+  e.stopPropagation();
+  const n = (+sc.dataset.turns || 0) + 1;
+  sc.dataset.turns = n;
+  if (n < 3) { sc.style.transform = `translate(-50%, -50%) rotate(${-n * SCREW_STEP_DEG}deg)`; return; }
+  sc.classList.add('out');
+  sc.style.transform = `translate(-50%, -50%) rotate(${-n * SCREW_STEP_DEG - 1080}deg)`;
+  setTimeout(() => { location.href = '/hardware/viewer.html'; }, 950);
+});
+
+// ---- The plate: 1-3 knob gangs plus the screen gang, at real Decora sizes ----
+function buildPlate(n) {
+  const plate = $('plate'), gangs = n + 1, w = PLATE_MM[gangs];
+  plate.style.setProperty('--w', w);
+  plate.setAttribute('aria-label', `${gangs}-gang Decora panel: ${n} knob${n > 1 ? 's' : ''} and a screen`);
+  plate.querySelectorAll('.screw, .insert.left').forEach(el => el.remove());
+  const x = i => `${(w / 2 + (i - (gangs - 1) / 2) * GANG_MM) / w * 100}%`;
+  for (let i = 0; i < gangs; i++) {
+    for (const top of ['9.5%', '90.5%']) {
+      const sc = document.createElement('div');
+      sc.className = 'screw'; sc.style.left = x(i); sc.style.top = top;
+      plate.prepend(sc);
+    }
+  }
+  for (let i = 0; i < n; i++) {
+    const ins = document.createElement('div');
+    ins.className = 'insert left'; ins.style.left = x(i);
+    ins.innerHTML = `<div class="knob" tabindex="0" role="slider" aria-label="Knob ${i + 1}" aria-valuemin="0" aria-valuemax="100">
+      <div class="knurl"></div><div class="face"></div>
+      <svg class="hold" viewBox="0 0 36 36"><circle class="holdRing" cx="18" cy="18" r="17" pathLength="100"/></svg></div>`;
+    plate.insertBefore(ins, $('screenGang'));
+    wireKnob(ins.querySelector('.knob'), i);
+  }
+  $('screenGang').style.left = x(gangs - 1);
+  document.querySelectorAll('#knobCount button').forEach(b => b.classList.toggle('on', +b.dataset.n === n));
+}
+
+// ---- Knob input: drag in a circle, wheel, push, hold ----
+let drag = null;
+function wireKnob(knob, k) {
+  knob.addEventListener('pointerdown', e => {
+    focusKnob(k);
+    knob.setPointerCapture(e.pointerId);
+    const r = knob.getBoundingClientRect();
+    drag = { el: knob, cx: r.left + r.width / 2, cy: r.top + r.height / 2, acc: 0, turned: false, held: false };
+    drag.last = Math.atan2(e.clientY - drag.cy, e.clientX - drag.cx);
+    knob.classList.add('pressed');
+    startHold(knob);
+  });
+  knob.addEventListener('pointermove', e => {
+    if (!drag || drag.el !== knob) return;
+    const a = Math.atan2(e.clientY - drag.cy, e.clientX - drag.cx);
+    let delta = (a - drag.last) * 180 / Math.PI;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    drag.last = a; drag.acc += delta;
+    if (Math.abs(drag.acc) > 4) { drag.turned = true; cancelHold(); }   // turning isn't holding
+    const detents = Math.trunc(drag.acc / DETENT_DEG);
+    if (detents) { drag.acc -= detents * DETENT_DEG; turn(detents); }
+  });
+  knob.addEventListener('pointerup', () => {
+    const push = drag && !drag.turned && !drag.held;   // press and release = a push
+    drag = null; cancelHold(); knob.classList.remove('pressed');
+    if (push) pushKnob();
+  });
+  knob.addEventListener('pointercancel', () => { drag = null; cancelHold(); knob.classList.remove('pressed'); });
+  knob.addEventListener('wheel', e => { e.preventDefault(); focusKnob(k); turn(e.deltaY < 0 ? 1 : -1); }, { passive: false });
+}
+
+// ---- Hold any knob to lock / unlock the whole panel ----
+let holdTimer = null, holdStart = 0, holdAnim = null;
+function startHold(knob) {
+  if (startPowerHold(() => { if (drag) drag.held = true; })) return;   // sauna: hold = start / stop
+  const ring = (knob || document.querySelectorAll('.knob')[state.focus]).querySelector('.holdRing');
+  holdStart = performance.now();
+  holdTimer = setTimeout(() => { if (drag) drag.held = true; cancelHold(); toggleLock(); }, HOLD_DELAY_MS + HOLD_FILL_MS);
+  const step = t => {
+    const p = (t - holdStart - HOLD_DELAY_MS) / HOLD_FILL_MS;   // negative while waiting: ring stays hidden
+    ring.classList.toggle('filling', p > 0);
+    ring.style.strokeDashoffset = 100 - Math.max(0, Math.min(1, p)) * 100;
+    if (holdTimer) holdAnim = requestAnimationFrame(step);
+  };
+  holdAnim = requestAnimationFrame(step);
+}
+function cancelHold() {
+  endPowerHold();
+  clearTimeout(holdTimer); holdTimer = null;
+  cancelAnimationFrame(holdAnim);
+  document.querySelectorAll('.holdRing').forEach(r => { r.style.strokeDashoffset = 100; r.classList.remove('filling'); });
+}
+
+// ---- Screen tap and keyboard ----
+// Touching the glass wakes the screen; only the mute circle mutes
+$('screen').addEventListener('click', e => {
+  if (!state.configured || state.adding) { openSetup(); return; }
+  if (state.menu !== null) return;   // menu items handle their own taps
+  if (state.adjust) { saveAdjust(); return; }
+  if (state.locked || state.code) { openCode(); return; }   // keypad keys handle their own taps
+  if (e.target.closest('#powerBtn')) return;                // long press handled below
+  const sp = K().speaker;
+  // Tap the name: every device like this one (e.g. all saunas) plus "+ Add sauna"
+  if (e.target.closest('#room') && state.awake && sp) { openMenu('same'); return; }
+  // Double-tap the temperature: °F / °C for the whole home
+  if (e.target.closest('#number') && state.awake && sp && sp.control === 'temperature') {
+    const now = Date.now();
+    if (now - lastNumberTap < 400) { lastNumberTap = 0; openMenu('units'); return; }
+    lastNumberTap = now;
+  }
+  if (e.target.closest('#muteBtn') && state.awake) { toggleMute(); event(`mute circle: knob ${state.focus + 1}`); }
+  else wake();
+});
+let lastNumberTap = 0;
+let lHeld = false;
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+  if (state.code && /^[0-9]$/.test(e.key)) { pressKey(e.key); return; }
+  if (state.code && e.key === 'Backspace') { pressKey('DEL'); return; }
+  if (state.code && e.key === 'Escape') { closeCode(); return; }
+  if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { e.preventDefault(); turn(1); }
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { e.preventDefault(); turn(-1); }
+  else if (e.key === 'm' || e.key === 'M') toggleMute(true);
+  else if (e.key >= '1' && e.key <= '3') { focusKnob(+e.key - 1); wake(); }
+  else if ((e.key === 'l' || e.key === 'L') && !lHeld) { lHeld = true; startHold(); }
+});
+document.addEventListener('keyup', e => { if (e.key === 'l' || e.key === 'L') { lHeld = false; cancelHold(); } });
+
+// ---- Size: px per mm, so the panel can be shown at real size ----
+const DEFAULT_MM = 7.35;      // 1.75x the original 4.2 px/mm
+let mm = DEFAULT_MM;
+try { mm = parseFloat(localStorage.getItem('wallvol.mm')) || DEFAULT_MM; } catch {}
+// The phone's screen renders the setup page at 402 pt and is scaled to its
+// physical width (CSS can't divide a length by a length, so it's done here)
+function fitPhone() {
+  const glass = document.querySelector('.phone .glass');
+  if (glass && glass.clientWidth) $('phone').style.setProperty('--s', glass.clientWidth / 402);
+}
+addEventListener('resize', fitPhone);
+function applySize() {
+  document.documentElement.style.setProperty('--mm', `${mm}px`);
+  requestAnimationFrame(fitPhone);
+  $('sizeLabel').textContent = `${Math.round(mm / DEFAULT_MM * 100)}% · ${mm.toFixed(2)} px/mm`;
+  try { localStorage.setItem('wallvol.mm', String(mm)); } catch {}
+}
+const resize = f => { mm = Math.max(2, Math.min(20, mm * f)); applySize(); };
+$('smaller').addEventListener('click', () => resize(1 / 1.05));
+$('bigger').addEventListener('click', () => resize(1.05));
+$('sizeReset').addEventListener('click', () => { mm = DEFAULT_MM; applySize(); });
+$('calibrate').addEventListener('click', () => $('card').classList.toggle('show'));
+$('cardClose').addEventListener('click', () => $('card').classList.remove('show'));
+applySize();
+
+// ---- Panels and state from the server (each panel is one simulated ESP32) ----
+let panels = [];
+let phoneOnLoad = new URLSearchParams(location.search).get('phone');
+async function poll(force = false) {
+  let list;
+  try { list = await (await fetch('/api/panels')).json(); }
+  catch { $('sConn').innerHTML = '<span class="dot bad"></span>Server not reachable'; return; }
+  panels = list.panels;
+  state.setupUrl = list.setup_url;
+  state.units = list.units || 'F';
+  if (!panels.some(x => x.id === PANEL)) { selectPanel(panels[0].id); return; }
+  renderTabs();
+  const p = panels.find(x => x.id === PANEL);
+  // ?phone=setup or ?phone=unlock opens the phone once a panel is selected (links, screenshots)
+  if (phoneOnLoad) {
+    const ph = phoneOnLoad; phoneOnLoad = null;
+    setTimeout(() => ph === 'unlock' ? openPhone(`/unlock?panel=${encodeURIComponent(PANEL)}`) : openSetup(), 0);
+  }
+  state.devices = p.devices || [];
+  if (p.knobs.length !== state.knobs.length) {
+    state.knobs = p.knobs.map((_, i) => state.knobs[i] || newKnob());
+    state.focus = Math.min(state.focus, state.knobs.length - 1);
+    buildPlate(state.knobs.length);
+  }
+  const wasConfigured = state.configured;
+  state.configured = p.configured;
+  state.hasCode = !!p.has_passcode;
+  if (p.screen && !state.adjust) state.screen = { ...p.screen };
+  if (p.auto_update !== undefined && Date.now() - (state.autoUpdateAt || 0) > 2500) state.autoUpdate = p.auto_update;
+  // a poll sent before our own lock reached the chip would undo it for a moment
+  if (p.locked !== state.locked && Date.now() - (state.lockAt || 0) > 2500) { state.locked = p.locked; if (!p.locked) { state.code = null; wake(); } }   // e.g. unlocked by an iPhone
+  $('nfc').hidden = !p.locked;
+  if (!p.configured) {
+    if (wasConfigured || force) {
+      clearPanelState();               // factory fresh: forget everything shown
+      showQr(); state.awake = true; clearTimeout(idleTimer);
+    }
+    render();
+    return;
+  }
+  let gotNew = false;
+  p.knobs.forEach((pk, i) => {
+    const kn = state.knobs[i];
+    const changed = (kn.speaker && kn.speaker.id) !== (pk.speaker && pk.speaker.id);
+    if (changed) {
+      Object.assign(kn, { level: null, muted: false, savedLevel: null });
+      if (pk.speaker && (state.adding || !wasConfigured)) gotNew = true;
+    }
+    kn.speaker = pk.speaker; kn.connected = pk.connected; kn.error = pk.error; kn.reading = pk.reading;
+    // Pick up changes made elsewhere (phone, speaker buttons, another panel),
+    // but not while this knob is moving or a command is in flight
+    const busy = kn.inFlight || kn.pending !== null || Date.now() - kn.lastLocal < POLL_MS;
+    if (pk.speaker && pk.speaker.startable && pk.volume > 0 && !busy) kn.target = Math.round(pk.volume);
+    if (pk.volume !== null && (force || changed || !busy)) {
+      const v = Math.round(pk.volume);
+      if (kn.muted && v > 0) { kn.muted = false; kn.savedLevel = null; }
+      if (!kn.muted) kn.level = v;
+    }
+  });
+  if (gotNew) {
+    if (state.adding) state.focus = state.addKnob;
+    state.adding = false;
+    closeSetupSoon(); wake();
+  }
+  render();
+}
+// After a factory reset / start over: nothing from the old setup stays on screen
+function clearPanelState() {
+  state.knobs = state.knobs.map(() => newKnob());
+  Object.assign(state, { focus: 0, menu: null, adding: false, locked: false, devices: [], adjust: null });
+  state.code = null;
+  clearTimeout(codeTimer); clearTimeout(menuTimer);
+  $('sLatency').textContent = '—';
+  $('phone').classList.remove('open');
+  qrFor = null;
+}
+
+function renderTabs() {
+  // Only show buttons that would do something
+  $('remove').hidden = panels.length <= 1;                                    // the only panel
+  $('reset').hidden = !(panels.find(x => x.id === PANEL) || {}).configured;    // already factory fresh
+  $('startOver').hidden = panels.length <= 1 && !panels.some(x => x.configured);   // nothing to erase
+  const nav = $('tabs');
+  nav.innerHTML = '';
+  panels.forEach((x, i) => {
+    const b = document.createElement('button');
+    b.className = 'tab' + (x.id === PANEL ? ' on' : '');
+    const rooms = x.knobs.filter(k => k.speaker).map(k => k.speaker.room);
+    b.textContent = rooms.length ? rooms.join(' · ') : `New panel ${i + 1}`;
+    b.onclick = () => selectPanel(x.id);
+    nav.appendChild(b);
+  });
+  const add = document.createElement('button');
+  add.className = 'tab add'; add.textContent = '+ Add panel'; add.onclick = addPanel;
+  nav.appendChild(add);
+}
+function selectPanel(id) {
+  if (id === PANEL && panels.length) { poll(true); return; }
+  PANEL = id;
+  try { localStorage.setItem('wallvol.panel', id); } catch {}
+  Object.assign(state, { knobs: [], focus: 0, configured: true, menu: null, adding: false, locked: false });
+  $('phone').classList.remove('open');
+  $('sLatency').textContent = '—';
+  qrFor = null;
+  logNext = 0; $('log').textContent = '';
+  poll(true).then(() => { showQr(); pollLog(); });
+}
+async function addPanel() {
+  const p = await (await fetch('/api/panels', { method: 'POST' })).json();
+  selectPanel(p.id);
+}
+document.querySelectorAll('#knobCount button').forEach(b => b.addEventListener('click', async () => {
+  await post(api('/knobs'), { count: +b.dataset.n });
+  poll(true);
+}));
+
+// ---- Setup: the code on the screen opens the phone flow ----
+let qrFor = null;
+const setupKnob = () => state.adding ? state.addKnob : state.focus;   // which knob the setup code is for
+const setupQuery = () => `?panel=${encodeURIComponent(PANEL)}${state.adding ? '&mode=add' : ''}${state.adding && state.addKind ? `&kind=${state.addKind}` : ''}&knob=${setupKnob()}`;
+// The QR link carries the token, so the phone that scans it can use the API (and nobody else on the network)
+const setupLink = () => `${state.setupUrl}${setupQuery()}&t=${encodeURIComponent(TOKEN)}`;
+function showQr() {
+  if (!state.setupUrl || (state.configured && !state.adding) || qrFor === setupLink() || typeof QRCode === 'undefined') return;
+  $('qr').innerHTML = '';
+  new QRCode($('qr'), { text: setupLink(), width: 256, height: 256, colorDark: '#0a0a0a', colorLight: '#f4f4f2', correctLevel: QRCode.CorrectLevel.M });
+  qrFor = setupLink();
+}
+function openPhone(url) {
+  $('phoneFrame').src = url;
+  $('phone').classList.add('open');
+  fitPhone();
+}
+$('nfc').addEventListener('click', () => openPhone(`/unlock?panel=${encodeURIComponent(PANEL)}`));
+function openSetup() {
+  if (!$('phone').classList.contains('open')) $('phoneFrame').src = `/setup${setupQuery()}`;
+  $('phone').classList.add('open');
+  fitPhone();
+}
+// If the phone setup is open, point it at the knob now chosen on the panel
+function syncPhone() {
+  if ($('phone').classList.contains('open')) $('phoneFrame').src = `/setup${setupQuery()}`;
+}
+function closeSetupSoon() { setTimeout(() => $('phone').classList.remove('open'), 2500); }
+$('phoneClose').addEventListener('click', () => $('phone').classList.remove('open'));
+$('reset').addEventListener('click', async () => {
+  if (!confirm('Factory reset this panel? It forgets its own settings and shows the setup code again. The home\'s devices stay on your other panels.')) return;
+  await post(api('/reset'));
+  clearPanelState();
+  poll(true);
+});
+$('remove').addEventListener('click', async () => {
+  if (!confirm('Remove this panel from the demo? The home\'s devices stay on your other panels.')) return;
+  await fetch(api(''), { method: 'DELETE' });
+  PANEL = null;
+  poll(true);
+});
+$('startOver').addEventListener('click', async () => {
+  if (!confirm('Start over as a brand-new user? This erases every panel, device, room name, AirPlay password and HomePod pairing key.')) return;
+  await post('/api/start-over');
+  clearPanelState();
+  logNext = 0; $('log').textContent = '';
+  PANEL = null;
+  poll(true);
+});
+
+// ---- Show / hide sections: remembered per browser ----
+for (const id of ['foldHelp', 'foldLog']) {
+  const el = $(id);
+  try { el.open = localStorage.getItem(`wallvol.${id}`) === 'open'; } catch {}
+  el.addEventListener('toggle', () => {
+    try { localStorage.setItem(`wallvol.${id}`, el.open ? 'open' : 'closed'); } catch {}
+    if (id === 'foldLog' && el.open) $('log').scrollTop = $('log').scrollHeight;
+  });
+}
+
+// ---- Chip log ----
+let logNext = 0;
+async function pollLog() {
+  try {
+    if (!PANEL) return;
+    const lines = await (await fetch(api(`/log?since=${logNext}`))).json();
+    if (!lines.length) return;
+    const pre = $('log');
+    const atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
+    for (const l of lines) {
+      const span = document.createElement('span');
+      span.className = l.level;
+      span.textContent = l.text + '\n';
+      pre.appendChild(span);
+      logNext = l.n + 1;
+    }
+    if (atBottom) pre.scrollTop = pre.scrollHeight;
+  } catch {}
+}
+
+buildPlate(1);
+setInterval(poll, POLL_MS);
+setInterval(pollLog, 700);
+poll(true).then(showQr);
+pollLog();
+</script>
+</body>
+</html>
